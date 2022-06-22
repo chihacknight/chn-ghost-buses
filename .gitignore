@@ -3,3 +3,4 @@
 ## ignore files for AWS deployment
 scrape_data/python/*
 scrape_data/chn-bus-scraper.zip
+.ipynb_checkpoints/

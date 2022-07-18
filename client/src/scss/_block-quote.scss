@@ -1,0 +1,43 @@
+.block-quote {
+  position: relative;
+  border-left: 12px solid $cta-blue;
+  width: 80%;
+  margin: 1em 0;
+  padding-left: 1em;
+  text-align: right;
+
+  h4 {
+    font-size: .85rem;
+    font-style: italic;
+    margin-bottom: 0.5em;
+
+    span {
+      color: $cta-red;
+    }
+  }
+
+  a {
+    color: $cta-blue;
+    margin: 1em 0 0.5em 0;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-decoration: none;
+    @include transitionHover;
+
+    &:hover,
+    &:focus {
+      color: $text-color;
+      @include transitionHover;
+    }
+  }
+}
+
+@media (min-width: $tablet-bp) {
+  .block-quote {
+    margin: 1em auto;
+
+    h4 {
+        font-size: 1em;;
+    }
+  }
+}

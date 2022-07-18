@@ -1,0 +1,68 @@
+.social-sidebar {
+    display: none;
+}
+
+@media (min-width: 800px) {
+    .social-sidebar {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        z-index: 20;
+        left: 3%;
+        margin-top: 2em;
+      
+        a {
+          display: inline-block;
+          margin-top: 0em;
+          text-decoration: none;
+          opacity: 0%;
+          animation: fade-in 1s forwards, drop-in 1s forwards;
+      
+          &:nth-of-type(2) {
+            animation-delay: 500ms;
+          }
+          &:nth-of-type(3) {
+            animation-delay: 900ms;
+          }
+      
+          .social-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba($cta-blue, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            @include transitionHover;
+      
+             &:hover {
+              background-color: $cta-blue;
+              @include transitionHover;
+            }
+      
+            i {
+              color: #fff;
+              font-size: 1.2rem;
+            }
+            img {
+              width: 23px;
+              height: 23px;
+              mix-blend-mode: lighten;
+              fill: #fff;
+            }
+          }
+        }
+      }
+      
+      @keyframes drop-in {
+        100% {
+          margin-top: 1em;
+        }
+      }
+      
+      @keyframes fade-in {
+        100% {
+          opacity: 100%;
+        }
+      }
+}

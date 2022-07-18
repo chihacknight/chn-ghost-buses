@@ -1,0 +1,23 @@
+// colors
+$cta-blue: #007BC4;
+$cta-red: rgba(211, 17, 69);
+$text-color: #575757;
+
+// breakpoints
+
+$tablet-bp: 450px;
+$desktop-bp: 800px;
+
+@mixin flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@mixin transitionHover {
+    transition: all 300ms ease-in;
+}
+
+@mixin dotNavtransition {
+    transition: all 500ms ease-in-out;
+}

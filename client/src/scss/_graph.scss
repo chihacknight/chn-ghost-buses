@@ -1,0 +1,46 @@
+.graph {
+  width: 60%;
+  margin: 2em auto;
+  padding: 1em 1em 1em 0;
+  border-left: 1px solid $cta-blue;
+  border-bottom: 1px solid $cta-blue;
+
+  &-bar {
+    height: 20px;
+    width: 50px;
+    margin-top: .25em;
+
+    &-red {
+      background-color: $cta-red;
+      animation: red-graph 2s forwards 0s 
+    }
+
+    &-green {
+      background-color: green;
+      animation: green-graph 2s forwards 50ms 
+    }
+
+    &-purple {
+      background-color: purple;
+      animation: purple-graph 2s forwards 70ms 
+    }
+  }
+}
+
+@keyframes red-graph {
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes green-graph {
+  100% {
+    width: 50%;
+  }
+}
+
+@keyframes purple-graph {
+  100% {
+    width: 25%;
+  }
+}

@@ -1,0 +1,146 @@
+aside {
+  .dot-nav {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    position: relative;
+    height: 100%;
+    width: 100%;
+
+    &-indicator {
+      z-index: 3;
+      width: 25px;
+      height: 25px;
+      position: absolute;
+      @include dotNavtransition;
+      left: 9%;
+      top: 0;
+
+      &.methods {
+        left: 34.5%;
+        @include dotNavtransition;
+      }
+      &.findings {
+        left: 59.5%;
+        @include dotNavtransition;
+      }
+      &.cta {
+        left: 84.5%;
+        @include dotNavtransition;
+      }
+    }
+
+    .dot-label {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      align-items: center;
+      width: 35%;
+      z-index: 1;
+      cursor: pointer;
+      margin-bottom: 6em;
+
+      &:hover,
+      &:focus {
+        .dot {
+          background-color: $cta-red;
+          @include transitionHover;
+        }
+
+        p::after {
+          opacity: 100%;
+          @include transitionHover;
+        }
+      }
+
+      .dot {
+        width: 15px;
+        height: 15px;
+        margin-bottom: 10px;
+        border-radius: 50%;
+        border: 2px solid $cta-red;
+        background-color: #fff;
+        @include transitionHover;
+      }
+
+      p {
+        color: $cta-red;
+        position: absolute;
+        font-size: 0.85em;
+        top: 55px;
+        left: -30px;
+        font-weight: bolder;
+        text-transform: capitalize;
+        border-bottom: 0px solid $cta-red;
+        transform: rotate(-60deg);
+        white-space: nowrap;
+        margin: 0;
+
+        &::after {
+          content: "";
+          position: absolute;
+          bottom: -3px;
+          left: 0;
+          height: 3px;
+          width: 100%;
+          background-color: $cta-red;
+          opacity: 0;
+          @include transitionHover;
+        }
+      }
+    }
+
+    .dot-line {
+      z-index: 0;
+      height: 8px;
+      left: 0;
+      right: 0;
+      top: 5px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 75%;
+      position: absolute;
+      background-color: $cta-red;
+    }
+  }
+}
+
+@media (min-width: $tablet-bp) {
+  aside .dot-nav {
+    .dot-label {
+      margin-bottom: 0;
+      p {
+        position: static;
+        transform: rotate(0deg);
+        margin: 0;
+        white-space: normal;
+      }
+    }
+  }
+}
+
+@media (min-width: $desktop-bp) {
+  aside .dot-nav {
+    &-indicator {
+      left: 11%;
+      &.methods {
+        left: 35.5%;
+        @include dotNavtransition;
+      }
+      &.findings {
+        left: 60.5%;
+        @include dotNavtransition;
+      }
+      &.cta {
+        left: 85.6%;
+        @include dotNavtransition;
+      }
+    }
+    .dot-label {
+      margin-bottom: 0;
+      p {
+        font-size: 1em;
+      }
+    }
+  }
+}

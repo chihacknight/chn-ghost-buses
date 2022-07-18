@@ -1,0 +1,38 @@
+footer {
+  background-color: $cta-blue;
+
+  .footer-container {
+    max-width: 800px;
+    margin: 0 auto;
+
+    h5 {
+      color: white;
+      font-size: 1em;
+      margin: 0.75em 0;
+    }
+
+    ul {
+      padding: 0;
+      li {
+        list-style: none;
+
+        a {
+          color: white;
+          text-decoration: none;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (min-width: $tablet-bp) {
+  footer .footer-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+  }
+}

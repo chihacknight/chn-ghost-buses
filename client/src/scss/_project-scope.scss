@@ -1,0 +1,37 @@
+.project-scope-container{
+   
+    margin: 0 auto;
+    justify-content: space-between;
+    min-height: 60vh;
+
+    main {
+        width: 100%;
+        margin-top: 3em;
+
+        .cta {
+
+            .btn-container {
+                @include flex-center;
+            }
+            
+            button{
+                
+                padding: .75em 2em;
+                border: none;
+                background-color: rgba($cta-blue,.8);
+                color: white;
+                text-transform: uppercase;
+                font-weight: bolder;
+                margin: 0 auto;
+                cursor: pointer;
+                @include transitionHover;
+
+                &:hover {
+                    background-color: $cta-blue;
+                    @include transitionHover
+                }
+            }
+        }
+       
+    }
+}

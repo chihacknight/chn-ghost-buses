@@ -1,0 +1,148 @@
+header {
+  position: relative;
+  margin-bottom: 5em;
+  margin-top: 3em;
+}
+.svg-container {
+  padding-top: 1em;
+  position: relative;
+  height: 200px;
+  background: url(../assets/Vector.png);
+  animation: skyline 35s infinite;
+  animation-timing-function: linear;
+  z-index: 2;
+}
+.bus-stop-container {
+  position: absolute;
+  bottom: -25px;
+  right: 0;
+  width: 15px;
+  animation: busStop 7s infinite;
+  animation-timing-function: linear;
+  z-index: 3;
+
+  p {
+    font-weight: 900;
+    color: rgba($cta-red, .6);
+    opacity: 0%;
+    animation: qPop 7s infinite, qRotate 2s infinite;
+    animation-timing-function: linear;
+    align-self: center;
+    position: absolute;
+    left: 45px;
+    top: -35px;
+  }
+
+  img {
+    height: 70px;
+    opacity: 55%;
+  }
+}
+.bus-container {
+  margin-bottom: 1em;
+
+  img {
+    width: 150px;
+    position: absolute;
+    z-index: 4;
+    bottom: -25px;
+    left: 20%;
+    opacity: 75%;
+    animation: svgBus 7s infinite;
+  }
+}
+
+
+
+@media (min-width: $tablet-bp) {
+    .bus-container{
+        img {
+            width: 200px;
+            bottom: -30px;
+        }
+    }
+    .svg-container {
+        animation: skyline 25s infinite;
+        animation-timing-function: linear;
+    }
+
+    .bus-stop-container {
+        animation: busStop 7s infinite;
+        animation-timing-function: linear;
+
+        img{
+            height: 90px;
+        }
+    }
+
+    @keyframes svgBus {
+        40% {
+          opacity: 75%;
+        }
+        55% {
+          opacity: 0%;
+        }
+        85% {
+          opacity: 0%;
+        }
+        100% {
+          opacity: 75%;
+        }
+      }
+
+}
+
+@media (min-width: $desktop-bp) {
+    .svg-container {
+        animation: skyline 15s infinite;
+        animation-timing-function: linear;
+    }
+}
+
+@keyframes skyline {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -1434px 0;
+  }
+}
+
+@keyframes svgBus {
+  30% {
+    opacity: 75%;
+  }
+  40% {
+    opacity: 0%;
+  }
+  90% {
+    opacity: 0%;
+  }
+  100% {
+    opacity: 75%;
+  }
+}
+
+@keyframes busStop {
+  100% {
+    right: 100%;
+  }
+}
+
+@keyframes qPop {
+  50% {
+    opacity: 0%;
+  }
+  55% {
+    opacity: 100%;
+  }
+  100% {
+    opacity: 100%;
+  }
+}
+
+@keyframes qRotate {
+    0%{transform: rotate(-15deg);}
+    50%{transform: rotate(15deg)}
+    100%{transform: rotate(-15deg)}
+}

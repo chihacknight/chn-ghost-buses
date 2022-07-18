@@ -1,0 +1,60 @@
+@import 'config';
+@import 'socials';
+@import 'header-animation';
+@import 'header';
+@import 'intro';
+@import 'block-quote';
+@import 'project-scope';
+@import 'dot-nav';
+@import 'graph';
+@import 'map';
+@import 'footer';
+
+
+.app {
+  width: 100%;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #fff;
+}
+
+.padding-container{
+  padding: 2em 3em;
+  width: 80%;
+  margin: 0 auto;
+
+}
+
+h2 {
+  color: $cta-red;
+  font-weight: 900;
+}
+
+hr {
+  width: 70%;
+  background-color: $cta-blue;
+  opacity: 40%;
+  height: 1px;
+  margin: 0 auto;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: $text-color;
+    line-height: 1.6;
+    font-size: 14px;
+    background-color: #F9F9F9;
+  }
+  
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+      monospace;
+  }

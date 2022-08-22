@@ -4,3 +4,5 @@ flake8==5.0.4
 black==22.6.0
 s3path==0.3.4
 tqdm==4.64.0
+autopep8==1.7.0
+python-dotenv==0.20.0

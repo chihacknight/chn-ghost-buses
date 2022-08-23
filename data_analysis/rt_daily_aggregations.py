@@ -6,7 +6,7 @@ import boto3
 import json
 import pandas as pd
 import pendulum
-
+from tqdm import tqdm
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,9 +46,10 @@ def compute_hourly_totals(
     else:
         bucket = s3.Bucket(bucket_type)
 
-    for day in date_range:
+    pbar = tqdm(date_range)
+    for day in pbar:
         date_str = day.to_date_string()
-        logger.info(
+        pbar.set_description(
             f"Processing {date_str} at {pendulum.now().to_datetime_string()}")
         objects = bucket.objects.filter(Prefix=f"bus_data/{date_str}")
 
@@ -59,8 +60,9 @@ def compute_hourly_totals(
         data_dict = {}
 
         # Access denied for public bucket
-        for obj in objects:
-            # logger.info(f"loading {obj}")
+        obj_pbar = tqdm(objects)
+        for obj in obj_pbar:
+            obj_pbar.set_description(f"loading {obj}")
             obj_name = obj.key
             # https://stackoverflow.com/questions/31976273/open-s3-object-as-a-string-with-boto3
             obj_body = json.loads(obj.get()["Body"].read().decode("utf-8"))
@@ -75,8 +77,9 @@ def compute_hourly_totals(
         errors = pd.DataFrame()
 
         # k, v here are filename: full dict of JSON
-        for k, v in data_dict.items():
-            # logger.info(f"processing {k}")
+        data_dict_pbar = tqdm(data_dict.items())
+        for k, v in data_dict_pbar:
+            data_dict_pbar.set_description(f"processing {k}")
             filename = k
             new_data = pd.DataFrame()
             new_errors = pd.DataFrame()
@@ -143,4 +146,4 @@ if __name__ == "__main__":
     start_date = "2022-07-17"
     end_date = "2022-08-07"
 
-    compute_hourly_totals(start_date, end_date)
+    data, errors, hourly_summary = compute_hourly_totals(start_date, end_date)

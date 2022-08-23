@@ -61,8 +61,8 @@ def combine_real_time_rt_comparison(
              f'{feed["schedule_version"]}.csv').as_uri())
 
         rt_raw = pd.DataFrame()
-        another_pbar = tqdm(date_range)
-        for day in another_pbar:
+        date_pbar = tqdm(date_range)
+        for day in date_pbar:
             date_str = day.to_date_string()
             pbar.set_description(
                 f"Processing {date_str} at"

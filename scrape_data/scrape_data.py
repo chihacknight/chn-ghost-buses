@@ -45,21 +45,23 @@ def scrape(routes_df, url):
 def lambda_handler(event, context):
     API_KEY = os.environ.get("CHN_GHOST_BUS_CTA_BUS_TRACKER_API_KEY")
     s3 = boto3.client("s3")
-    api_url = (
-        f"http://www.ctabustracker.com/bustime/api"
-        f"/v2/getvehicles?key={API_KEY}"
-    )
-    routes_df = pd.read_csv(
-        # TODO: we can move the to-scrape route list to the public bucket later
-        s3.get_object(Bucket=BUCKET_PRIVATE, Key="current_routes.txt")["Body"]
-    )
-    logger.info("Loaded routes df")
-    data = json.dumps(scrape(routes_df, api_url))
-    logger.info("Saving data")
-    t = pendulum.now("America/Chicago")
-    for bucket in [BUCKET_PUBLIC, BUCKET_PRIVATE]:
-        s3.put_object(
-            Bucket=bucket,
-            Key=f"bus_data/{t.to_date_string()}/{t.to_time_string()}.json",
-            Body=data,
+    # tuple of the form: (version label as used in URL, version label to append to top-level directory name)
+    for api_version in [('v2', ''), ('v3', '_v3')]:
+        api_url = (
+            f"http://www.ctabustracker.com/bustime/api"
+            f"/{api_version[0]}/getvehicles?key={API_KEY}"
         )
+        routes_df = pd.read_csv(
+            # TODO: we can move the to-scrape route list to the public bucket later
+            s3.get_object(Bucket=BUCKET_PRIVATE, Key="current_routes.txt")["Body"]
+        )
+        logger.info("Loaded routes df")
+        data = json.dumps(scrape(routes_df, api_url))
+        logger.info("Saving data")
+        t = pendulum.now("America/Chicago")
+        for bucket in [BUCKET_PUBLIC, BUCKET_PRIVATE]:
+            s3.put_object(
+                Bucket=bucket,
+                Key=f"bus_data{api_version[1]}/{t.to_date_string()}/{t.to_time_string()}.json",
+                Body=data,
+            )

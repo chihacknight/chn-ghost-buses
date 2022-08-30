@@ -1,0 +1,6 @@
+boto3==1.21.21 # The version can also be removed to resolve conflict.
+pandas==1.4.3
+geopandas==0.11.1
+s3fs==2022.7.1
+shapely==1.8.4
+jupyter==1.0.0

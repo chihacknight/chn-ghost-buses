@@ -8,15 +8,15 @@ import pandas as pd
 import pendulum
 import requests
 
-from dotenv import load_dotenv
-
-load_dotenv()
+# use for dev, but don't deploy to Lambda:
+# from dotenv import load_dotenv
+# load_dotenv()
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+BUCKET_PRIVATE = os.getenv('BUCKET_PRIVATE', 'chn-ghost-buses-private')
 BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
-
 
 def scrape(routes_df, url):
     bus_routes = routes_df[routes_df.route_type == 3]
@@ -44,21 +44,22 @@ def scrape(routes_df, url):
 
 def lambda_handler(event, context):
     API_KEY = os.environ.get("CHN_GHOST_BUS_CTA_BUS_TRACKER_API_KEY")
-    BUCKET_NAME = BUCKET_PUBLIC
     s3 = boto3.client("s3")
     api_url = (
         f"http://www.ctabustracker.com/bustime/api"
         f"/v2/getvehicles?key={API_KEY}"
     )
     routes_df = pd.read_csv(
-        s3.get_object(Bucket=BUCKET_NAME, Key="current_routes.txt")["Body"]
+        # TODO: we can move the to-scrape route list to the public bucket later
+        s3.get_object(Bucket=BUCKET_PRIVATE, Key="current_routes.txt")["Body"]
     )
     logger.info("Loaded routes df")
     data = json.dumps(scrape(routes_df, api_url))
     logger.info("Saving data")
     t = pendulum.now("America/Chicago")
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=f"bus_data/{t.to_date_string()}/{t.to_time_string()}.json",
-        Body=data,
-    )
+    for bucket in [BUCKET_PUBLIC, BUCKET_PRIVATE]:
+        s3.put_object(
+            Bucket=bucket,
+            Key=f"bus_data/{t.to_date_string()}/{t.to_time_string()}.json",
+            Body=data,
+        )

@@ -1,5 +1,11 @@
 .DS_Store
 .ipynb_checkpoints/
+venv
+.venv
+.vscode
+.env
+
+*.geojson
 
 ## ignore files for AWS deployment
 scrape_data/python/*

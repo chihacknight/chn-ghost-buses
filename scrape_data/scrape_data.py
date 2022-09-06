@@ -47,6 +47,7 @@ def lambda_handler(event, context):
     s3 = boto3.client("s3")
     # tuple of the form: (version label as used in URL, version label to append to top-level directory name)
     for api_version in [('v2', ''), ('v3', '_v3')]:
+        logger.info(f"Hitting API version {api_version[0]}")
         api_url = (
             f"http://www.ctabustracker.com/bustime/api"
             f"/{api_version[0]}/getvehicles?key={API_KEY}"
@@ -60,8 +61,10 @@ def lambda_handler(event, context):
         logger.info("Saving data")
         t = pendulum.now("America/Chicago")
         for bucket in [BUCKET_PUBLIC, BUCKET_PRIVATE]:
+            key = f"bus_data{api_version[1]}/{t.to_date_string()}/{t.to_time_string()}.json"
+            logger.info(f"Writing to {key}")
             s3.put_object(
                 Bucket=bucket,
-                Key=f"bus_data{api_version[1]}/{t.to_date_string()}/{t.to_time_string()}.json",
+                Key=key,
                 Body=data,
             )

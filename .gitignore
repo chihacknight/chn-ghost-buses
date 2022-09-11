@@ -5,7 +5,15 @@ venv
 .vscode
 .env
 
-*.geojson
+# ignore files in scratch subfolder in plots and data_output folders
+!data_output/scratch/*
+data_output/scratch/*
+!plots/scratch/*
+plots/scratch/*
+
+# Keep the .gitkeep files to preserve folder structure
+!data_output/scratch/.gitkeep
+!plots/scratch/.gitkeep
 
 ## ignore files for AWS deployment
 scrape_data/python/*

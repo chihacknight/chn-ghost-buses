@@ -63,7 +63,7 @@ def boxplot(
             Defaults to None.
         show (bool, optional): whether to show plot. Defaults to False.
         save (bool, optional): whether to save plot. Defaults to True.
-        save_name (str, optional): _description_. Defaults to None.
+        save_name (str, optional): Name of the saved boxplot. Defaults to None.
     """
     sns.set_theme(style='ticks', palette='pastel')
     fig = sns.boxplot(x=x, y=y, data=data)

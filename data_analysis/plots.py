@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Union
 
@@ -14,16 +15,27 @@ import seaborn as sns
 import compare_scheduled_and_rt
 import static_gtfs_analysis
 
+
 CHICAGO_COORDINATES = (41.85, -87.68)
-PLOTS_PATH = Path(__file__).parent.parent / 'plots' / 'scratch'
+
+# Return the project root directory
+# https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
+project_name = os.getenv('PROJECT_NAME', 'chn-ghost-buses')
+current_dir = Path(__file__)
+project_dir = next(
+    p for p in current_dir.parents
+    if p.name == f'{project_name}'
+)
+PLOTS_PATH = project_dir / 'plots' / 'scratch'
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
 
 
-def n_routes(df: Union[pd.DataFrame, gpd.GeoDataFrame],
-             n: int = 10,
-             lowest: bool = True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+def n_worst_best_routes(
+    df: Union[pd.DataFrame, gpd.GeoDataFrame],
+    n: int = 10,
+        worst: bool = True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """Returns the n route_ids with the lowest or highest ratio
        of completed trips
 
@@ -31,13 +43,14 @@ def n_routes(df: Union[pd.DataFrame, gpd.GeoDataFrame],
         df (Union[pd.DataFrame, gpd.GeoDataFrame]): DataFrame with ratio
             of completed trips by route_id
         n (int, optional): number of route_ids to return . Defaults to 10.
-        lowest (bool, optional): whether to return the lowest ratios
+        worst (bool, optional): whether to return the lowest ratios.
+            Defaults to True.
     Returns:
         Union[pd.DataFrame, gpd.GeoDataFrame]: A DataFrame containing the
-            n worst routes.
+            n worst or best routes.
     """
     df = df.copy()
-    if lowest:
+    if worst:
         return df.sort_values(by="ratio").drop_duplicates(['route_id']).head(n)
     else:
         return (
@@ -147,7 +160,7 @@ def main() -> None:
 
     # Worst performing routes
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
-    worst_geo = n_routes(summary_gdf_geo)
+    worst_geo = n_worst_best_routes(summary_gdf_geo)
     plot_map(
         worst_geo,
         cmap='winter',
@@ -157,7 +170,7 @@ def main() -> None:
     )
 
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
-    best_geo = n_routes(summary_gdf_geo, lowest=False)
+    best_geo = n_worst_best_routes(summary_gdf_geo, worst=False)
     plot_map(
         best_geo,
         cmap='winter',

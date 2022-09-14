@@ -183,7 +183,7 @@ def build_summary(
     return summary
 
 
-if __name__ == "__main__":
+def main():
     schedule_feeds = [
         {
             "schedule_version": "20220507",
@@ -213,4 +213,8 @@ if __name__ == "__main__":
     ]
 
     combined_df = combine_real_time_rt_comparison(schedule_feeds, save=False)
-    summary_df = build_summary(combined_df, save=False)
+    return build_summary(combined_df, save=False)
+
+
+if __name__ == "__main__":
+    main()

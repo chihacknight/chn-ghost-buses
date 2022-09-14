@@ -389,13 +389,14 @@ def main() -> None:
     final_gdf["geometry"] = final_gdf["geometry"].simplify(0.0001)
 
     save_path = (
-        Path(__file__).parent / "geojson" /
+        Path(__file__).parent.parent / "data_output" / "scratch" /
         f"route_shapes_simplified_linestring"
         f"_{pendulum.now().strftime('%Y-%m-%d-%H:%M:%S')}.geojson"
     )
     with open(str(save_path), "w") as f:
         f.write(final_gdf.loc[(final_gdf["route_type"] == "3")].to_json())
     logging.info(f'geojson saved to {save_path}')
+    return final_gdf
 
 
 if __name__ == "__main__":

@@ -10,16 +10,17 @@ import pendulum
 # from dotenv import load_dotenv
 # load_dotenv()
 
-BUCKET_PRIVATE = os.getenv('BUCKET_PRIVATE')
-BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC')
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+BUCKET_PRIVATE = os.getenv("BUCKET_PRIVATE")
+BUCKET_PUBLIC = os.getenv("BUCKET_PUBLIC")
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
 
 
-def combine_daily_files(
-    date: str
-):
+def combine_daily_files(date: str):
     """Combine raw JSON files returned by API into daily CSVs. 
 
     Args:
@@ -28,59 +29,77 @@ def combine_daily_files(
     s3 = boto3.resource("s3")
 
     for bucket_name in [BUCKET_PRIVATE, BUCKET_PUBLIC]:
+        logging.info(f"processing data from {bucket_name}")
         bucket = s3.Bucket(bucket_name)
         objects = bucket.objects.filter(Prefix=f"bus_data/{date}")
+        logging.info(f"loaded objects to process for {date}")
 
-        # load data
-        data_dict = {}
-
+        data_list = []
+        errors_list = []
+        counter = 0
         for obj in objects:
+            counter += 1
+            if counter % 20 == 0:
+                logger.info(f"processing object # {counter}") 
             obj_name = obj.key
             # https://stackoverflow.com/questions/31976273/open-s3-object-as-a-string-with-boto3
             obj_body = json.loads(obj.get()["Body"].read().decode("utf-8"))
-            data_dict[obj_name] = obj_body
 
-            data = pd.DataFrame()
-            errors = pd.DataFrame()
+            new_data = pd.DataFrame()
+            new_errors = pd.DataFrame()
 
-            # k, v here are filename, full dict of JSON
-            for k, v in data_dict.items():
-                filename = k
-                new_data = pd.DataFrame()
-                new_errors = pd.DataFrame()
-                # expect ~12 "chunks" per JSON
-                for chunk, contents in v.items():
-                    if "vehicle" in v[chunk]["bustime-response"].keys():
-                        new_data = new_data.append(
-                            pd.DataFrame(v[chunk]["bustime-response"]["vehicle"])
-                        )
-                    if "error" in v[chunk]["bustime-response"].keys():
-                        new_errors = new_errors.append(
-                            pd.DataFrame(v[chunk]["bustime-response"]["error"])
-                        )
-                new_data["scrape_file"] = filename
-                new_errors["scrape_file"] = filename
-                data = data.append(new_data)
-                errors = errors.append(new_errors)
+            # expect ~12 "chunks" per JSON
+            for chunk in obj_body.keys():
+                if "vehicle" in obj_body[chunk]["bustime-response"].keys():
+                    new_data = pd.concat(
+                        [
+                        new_data, 
+                            pd.DataFrame(
+                                obj_body[chunk]["bustime-response"]["vehicle"]
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+                if "error" in obj_body[chunk]["bustime-response"].keys():
+                    new_errors = pd.concat(
+                        [
+                        new_errors,
+                            pd.DataFrame(obj_body[chunk]["bustime-response"]["error"]),
+                        ],
+                        ignore_index=True,
+                    )
+                new_data["scrape_file"] = obj_name
+                new_errors["scrape_file"] = obj_name
 
-            if len(errors) > 0:
-                bucket.put_object(
-                    Body=errors.to_csv(index=False),
-                    Key=f"bus_full_day_errors_v2/{date}.csv",
+                data_list.append(new_data)
+                errors_list.append(new_errors)
+
+        data = pd.concat(data_list, ignore_index=True)
+        errors = pd.concat(errors_list, ignore_index=True)
+
+        if len(errors) > 0:
+            error_key = f"bus_full_day_errors_v2/{date}.csv"
+            logging.info(f"saving errors to {bucket}/{error_key}")
+            bucket.put_object(
+                Body=errors.to_csv(index=False),
+                Key=error_key,
+            )
+
+        if len(data) > 0:
+            # convert data time to actual datetime
+            data["data_time"] = pd.to_datetime(
+                    data["tmstmp"], format="%Y%m%d %H:%M"
                 )
 
-            if len(data) > 0:
-                # convert data time to actual datetime
-                data["data_time"] = pd.to_datetime(
-                    data["tmstmp"], format="%Y%m%d %H:%M")
+            data["data_hour"] = data.data_time.dt.hour
+            data["data_date"] = data.data_time.dt.date
 
-                data["data_hour"] = data.data_time.dt.hour
-                data["data_date"] = data.data_time.dt.date
-
-                bucket.put_object(
-                    Body=data.to_csv(index=False),
-                    Key=f"bus_full_day_data_v2/{date}.csv",
-                )
+            data_key = f"bus_full_day_data_v2/{date}.csv"
+            logging.info(f"saving data to {bucket}/{data_key}")
+            bucket.put_object(
+                Body=data.to_csv(index=False),
+                Key=data_key,
+            )
 
 
 def lambda_handler(event, context):

@@ -15,8 +15,9 @@ import requests
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-BUCKET_PRIVATE = os.getenv('BUCKET_PRIVATE', 'chn-ghost-buses-private')
-BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
+BUCKET_PRIVATE = os.getenv("BUCKET_PRIVATE", "chn-ghost-buses-private")
+BUCKET_PUBLIC = os.getenv("BUCKET_PUBLIC", "chn-ghost-buses-public")
+
 
 def scrape(routes_df, url):
     bus_routes = routes_df[routes_df.route_type == 3]
@@ -29,10 +30,7 @@ def scrape(routes_df, url):
         logger.info(f"Requesting routes: {route_query_string}")
         try:
             chunk_response = json.loads(
-                requests.get(
-                    url +
-                    f"&rt={route_query_string}" +
-                    "&format=json").text
+                requests.get(url + f"&rt={route_query_string}" + "&format=json").text
             )
             response_json[f"chunk_{chunk}"] = chunk_response
         except requests.RequestException as e:
@@ -46,7 +44,7 @@ def lambda_handler(event, context):
     API_KEY = os.environ.get("CHN_GHOST_BUS_CTA_BUS_TRACKER_API_KEY")
     s3 = boto3.client("s3")
     # tuple of the form: (version label as used in URL, version label to append to top-level directory name)
-    for api_version in [('v2', ''), ('v3', '_v3')]:
+    for api_version in [("v2", ""), ("v3", "_v3")]:
         logger.info(f"Hitting API version {api_version[0]}")
         api_url = (
             f"http://www.ctabustracker.com/bustime/api"

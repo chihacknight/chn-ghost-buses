@@ -24,7 +24,7 @@ def combine_daily_files(date: str):
     """Combine raw JSON files returned by API into daily CSVs. 
 
     Args:
-        date: Date string for which raw JSON files should be combined into CSVs.
+        date: Date string for which raw JSON files should be combined into CSVs. Format: YYYY-MM-DD.
     """
     s3 = boto3.resource("s3")
 

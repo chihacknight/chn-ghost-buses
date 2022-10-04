@@ -11,6 +11,8 @@ import pendulum
 from tqdm import tqdm
 from dotenv import load_dotenv
 
+import static_gtfs_analysis
+
 
 load_dotenv()
 
@@ -41,6 +43,29 @@ class AggInfo:
     freq: str = 'D'
     aggvar: str = 'trip_count'
     byvars: List[str] = field(default_factory=lambda: ['date', 'route_id'])
+
+
+def make_daily_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Make a summary of trips that actually happened. The result will be
+        used as base data for further aggregations.
+
+    Args:
+        df (pd.DataFrame): A DataFrame read from bus_full_day_data_v2/{date}.
+
+    Returns:
+        pd.DataFrame: A summary of full day data by
+            date, route, and destination.
+    """
+    df = df.copy()
+    df = (
+        df.groupby(["data_date", "rt", "des"])
+        .agg({"vid": set, "tatripid": set, "tablockid": set})
+        .reset_index()
+    )
+    df["vh_count"] = df["vid"].apply(len)
+    df["trip_count"] = df["tatripid"].apply(len)
+    df["block_count"] = df["tablockid"].apply(len)
+    return df
 
 
 def sum_by_frequency(
@@ -143,6 +168,7 @@ def sum_trips_by_rt_by_freq(
 # Read in pre-computed files of RT and scheduled data and compare!
 def combine_real_time_rt_comparison(
     schedule_feeds: List[dict],
+    schedule_data_list: List[dict],
     agg_info: AggInfo,
     my_range: List[str] = ["2022-05-31", "2022-07-04"],
         save: bool = True) -> pd.DataFrame:
@@ -151,6 +177,9 @@ def combine_real_time_rt_comparison(
     Args:
         schedule_feeds (List[dict]): A list of dictionaries with the keys
              "schedule_version", "feed_start_date", and "feed_end_date"
+        schedule_data_list (List[dict]): A list of dictionaries with a
+            "schedule_version" key and "data" key with a value corresponding to
+            the daily route summary for that version.
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
         my_range (List[str], optional): A custom date range for trips.
@@ -176,10 +205,17 @@ def combine_real_time_rt_comparison(
         pbar.set_description(
             f"Loading schedule version {feed['schedule_version']}"
         )
-        schedule_raw = pd.read_csv(
-            (SCHEDULE_SUMMARY_PATH /
-             f'schedule_route_daily_hourly_summary_v'
-             f'{feed["schedule_version"]}.csv').as_uri())
+        if agg_info.freq == 'H':
+            schedule_raw = pd.read_csv(
+                (SCHEDULE_SUMMARY_PATH /
+                 f'schedule_route_daily_hourly_summary_v'
+                 f'{feed["schedule_version"]}.csv').as_uri())
+        else:
+            schedule_raw = (
+                next(data_dict["data"]
+                     for data_dict in schedule_data_list
+                     if feed["schedule_version"] == data_dict["schedule_version"])
+            )
 
         rt_raw = pd.DataFrame()
         date_pbar = tqdm(date_range)
@@ -189,9 +225,24 @@ def combine_real_time_rt_comparison(
                 f"Processing {date_str} at"
                 f"{pendulum.now().to_datetime_string()}"
             )
-            daily_data = pd.read_csv(
-                (BASE_PATH / f"bus_hourly_summary_v2/{date_str}.csv").as_uri()
-            )
+
+            if agg_info.freq == 'H':
+                daily_data = pd.read_csv(
+                    (BASE_PATH / f"bus_hourly_summary_v2/{date_str}.csv")
+                    .as_uri()
+                )
+
+            # Use low_memory option to avoid warning about columns
+            # with mixed dtypes.
+            else:
+                daily_data = pd.read_csv(
+                    (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
+                    .as_uri(),
+                    low_memory=False
+                )
+
+                daily_data = make_daily_summary(daily_data)
+
             rt_raw = pd.concat([rt_raw, daily_data])
 
         # basic reformatting
@@ -264,9 +315,11 @@ def build_summary(
     return summary
 
 
-def main() -> pd.DataFrame:
+def main(freq: str = 'D') -> pd.DataFrame:
     """Calculate the summary by route and day across multiple schedule versions
 
+    Args:
+        freq (str): Frequency of aggregation. Defaults to Daily.
     Returns:
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
@@ -298,9 +351,43 @@ def main() -> pd.DataFrame:
             "feed_end_date": "2022-07-20",
         },
     ]
-    agg_info = AggInfo()
+
+    schedule_data_list = []
+    pbar = tqdm(schedule_feeds)
+    for feed in pbar:
+        pbar.set_description(
+            f"Generating daily schedule data for "
+            f"schedule version {feed['schedule_version']}"
+        )
+        logging.info(
+            f"\nDownloading zip file for schedule version "
+            f"{feed['schedule_version']}"
+        )
+        CTA_GTFS = static_gtfs_analysis.download_zip(feed['schedule_version'])
+        logging.info("\nExtracting data")
+        data = static_gtfs_analysis.GTFSFeed.extract_data(CTA_GTFS)
+        data = static_gtfs_analysis.format_dates_hours(data)
+        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+        logging.info("\nSummarizing trip data")
+        if freq == 'H':
+            route_daily_summary = (
+                static_gtfs_analysis
+                .summarize_and_save(trip_summary, hourly=True, save=False)
+            )
+        else:
+            route_daily_summary = (
+                static_gtfs_analysis
+                .summarize_and_save(trip_summary, hourly=False, save=False)
+            )
+        schedule_data_list.append(
+            {"schedule_version": feed["schedule_version"],
+             "data": route_daily_summary}
+        )
+
+    agg_info = AggInfo(freq=freq)
     combined_df = combine_real_time_rt_comparison(
         schedule_feeds,
+        schedule_data_list=schedule_data_list,
         agg_info=agg_info,
         save=False)
     return build_summary(combined_df, save=False)

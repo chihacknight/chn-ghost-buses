@@ -59,7 +59,7 @@ class GTFSFeed:
             GTFSFeed: A GTFSFeed object containing multiple DataFrames
                 accessible by name.
         """
-        logging.info(f"Extracting data from {gtfs_zipfile}")
+        logging.info(f"Extracting data from CTA zipfile version {VERSION_ID}")
         data_dict = {}
         pbar = tqdm(cls.__annotations__.keys())
         for txt_file in pbar:
@@ -219,9 +219,9 @@ def make_trip_summary(data: GTFSFeed) -> pd.DataFrame:
         service_happened, how="left", on="service_id")
 
     # get only the trip / hour combos that actually occurred
-    trip_stop_hours = data.stop_times[[
-        "trip_id", "arrival_hour"]].drop_duplicates()
-
+    trip_stop_hours = data.stop_times.drop_duplicates(
+        ["trip_id", "arrival_hour"]
+    )
     # now join
     # result has one row per date + row from trips.txt (incl. route) + hour
     trip_summary = trips_happened.merge(
@@ -230,68 +230,99 @@ def make_trip_summary(data: GTFSFeed) -> pd.DataFrame:
     return trip_summary
 
 
+def group_trips(trip_summary: pd.DataFrame, groupby_vars: list, hourly: bool):
+    trip_summary = trip_summary.copy()
+    summary = (
+        trip_summary.groupby(by=groupby_vars)
+        ["trip_id"]
+        .count()
+        .reset_index()
+    )
+
+    if hourly:
+        summary.rename(
+            columns={
+                "arrival_hour": "hour",
+                "trip_id": "trip_count",
+                "raw_date": "date"},
+            inplace=True,
+        )
+
+    else:
+        summary.rename(
+            columns={
+                "trip_id": "trip_count",
+                "raw_date": "date"},
+            inplace=True
+        )
+    summary.date = summary.date.dt.date
+    return summary
+
+
 def summarize_and_save(trip_summary: pd.DataFrame,
+                       hourly: bool = True,
                        save: bool = True) -> pd.DataFrame:
     """Get trips by hour, date, and route
 
     Args:
         trip_summary (pd.DataFrame): a summary of trips with one row per date.
             Output of the make_trip_summary function.
+        hourly: (bool, optional): whether to aggregate by arrival_hour.
+            Defaults to True.
         save (bool, optional): whether to save to S3 bucket. Defaults to True.
 
     Returns:
-        pd.DataFrame: A DataFrame grouped by date, hour, route, and direction.
+        pd.DataFrame: A DataFrame grouped by date, hour, and route
     """
-    # now group to get trips by hour by date by route
-    route_daily_hourly_summary = (
-        trip_summary.groupby(by=["raw_date", "route_id", "arrival_hour"])
-        ["trip_id"]
-        .count()
-        .reset_index()
-    )
+    trip_summary = trip_summary.copy()
+    groupby_vars = ["raw_date", "route_id"]
 
-    route_daily_hourly_summary.rename(
-        columns={
-            "arrival_hour": "hour",
-            "trip_id": "trip_count",
-            "raw_date": "date"},
-        inplace=True,
-    )
-    route_daily_hourly_summary.date = route_daily_hourly_summary.date.dt.date
-    if save:
-        route_daily_hourly_summary.to_csv(
-            f"s3://{BUCKET}/schedule_summaries/route_level"
-            f"/schedule_route_daily_hourly_summary_v{VERSION_ID}.csv",
-            index=False,
+    if hourly:
+        groupby_vars.append("arrival_hour")
+        # group to get trips by hour by date by route
+        route_daily_summary = group_trips(
+            trip_summary,
+            groupby_vars=groupby_vars,
+            hourly=hourly
         )
 
-    # now group to get trips by hour by date by route by *direction*
-    route_dir_daily_hourly_summary = (
-        trip_summary.groupby(
-            by=["raw_date", "route_id",
-                "direction", "arrival_hour"])["trip_id"]
-        .count()
-        .reset_index()
-    )
+        if save:
+            route_daily_summary.to_csv(
+                f"s3://{BUCKET}/schedule_summaries/route_level"
+                f"/schedule_route_daily_hourly_summary_v{VERSION_ID}.csv",
+                index=False,
+            )
 
-    route_dir_daily_hourly_summary.rename(
-        columns={
-            "arrival_hour": "hour",
-            "trip_id": "trip_count",
-            "raw_date": "date"},
-        inplace=True,
-    )
-    route_dir_daily_hourly_summary.date = (
-        route_dir_daily_hourly_summary
-        .date.dt.date
-    )
-    if save:
-        route_dir_daily_hourly_summary.to_csv(
-            f"s3://{BUCKET}/schedule_summaries/route_dir_level/"
-            f"schedule_route_dir_daily_hourly_summary_v{VERSION_ID}.csv",
-            index=False,
+        # group to get trips by hour by date by route by *direction*
+        groupby_vars.append("direction")
+        route_dir_daily_summary = group_trips(
+            trip_summary,
+            groupby_vars=groupby_vars,
+            hourly=hourly
         )
-    return route_dir_daily_hourly_summary
+
+        if save:
+            route_dir_daily_summary.to_csv(
+                f"s3://{BUCKET}/schedule_summaries/route_dir_level/"
+                f"schedule_route_dir_daily_hourly_summary_v{VERSION_ID}.csv",
+                index=False,
+            )
+
+    else:
+        route_daily_summary = group_trips(
+            trip_summary,
+            groupby_vars=groupby_vars,
+            hourly=hourly
+        )
+
+        groupby_vars.append("direction")
+        route_dir_daily_summary = group_trips(
+            trip_summary,
+            groupby_vars=groupby_vars,
+            hourly=hourly
+        )
+
+        return route_daily_summary
 
 
 def make_linestring_of_points(
@@ -310,20 +341,34 @@ def make_linestring_of_points(
     return shapely.geometry.LineString(list(sorted_df["pt"]))
 
 
-def main() -> None:
-    """Download data from CTA, construct shapes from shape data,
-    and save to geojson file
+def download_zip(version_id: str) -> zipfile.ZipFile:
+    """Download a version schedule from transitfeeds.com
+
+    Args:
+        version_id (str): The version schedule in the form
+            of a date e.g. YYYYMMDD
+
+    Returns:
+        zipfile.ZipFile: A zipfile for the CTA version id.
     """
     logger.info('Downloading CTA data')
     CTA_GTFS = zipfile.ZipFile(
         BytesIO(
             requests.get(
                 f"https://transitfeeds.com/p/chicago-transit-authority"
-                f"/165/{VERSION_ID}/download"
+                f"/165/{version_id}/download"
             ).content
         )
     )
     logging.info('Download complete')
+    return CTA_GTFS
+
+
+def main() -> None:
+    """Download data from CTA, construct shapes from shape data,
+    and save to geojson file
+    """
+    CTA_GTFS = download_zip(VERSION_ID)
     data = GTFSFeed.extract_data(CTA_GTFS)
     data = format_dates_hours(data)
 

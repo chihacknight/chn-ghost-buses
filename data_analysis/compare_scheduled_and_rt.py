@@ -205,17 +205,13 @@ def combine_real_time_rt_comparison(
         pbar.set_description(
             f"Loading schedule version {feed['schedule_version']}"
         )
-        if agg_info.freq == 'H':
-            schedule_raw = pd.read_csv(
-                (SCHEDULE_SUMMARY_PATH /
-                 f'schedule_route_daily_hourly_summary_v'
-                 f'{feed["schedule_version"]}.csv').as_uri())
-        else:
-            schedule_raw = (
-                next(data_dict["data"]
-                     for data_dict in schedule_data_list
-                     if feed["schedule_version"] == data_dict["schedule_version"])
+
+        schedule_raw = (
+            next(
+                data_dict["data"] for data_dict in schedule_data_list
+                if feed["schedule_version"] == data_dict["schedule_version"]
             )
+        )
 
         rt_raw = pd.DataFrame()
         date_pbar = tqdm(date_range)
@@ -226,22 +222,15 @@ def combine_real_time_rt_comparison(
                 f"{pendulum.now().to_datetime_string()}"
             )
 
-            if agg_info.freq == 'H':
-                daily_data = pd.read_csv(
-                    (BASE_PATH / f"bus_hourly_summary_v2/{date_str}.csv")
-                    .as_uri()
-                )
-
             # Use low_memory option to avoid warning about columns
             # with mixed dtypes.
-            else:
-                daily_data = pd.read_csv(
-                    (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
-                    .as_uri(),
-                    low_memory=False
-                )
+            daily_data = pd.read_csv(
+                (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
+                .as_uri(),
+                low_memory=False
+            )
 
-                daily_data = make_daily_summary(daily_data)
+            daily_data = make_daily_summary(daily_data)
 
             rt_raw = pd.concat([rt_raw, daily_data])
 
@@ -284,7 +273,8 @@ def build_summary(
 
     Args:
         combined_df (pd.DataFrame): A DataFrame with all schedule versions
-        date_range (List[str]):
+        date_range (List[str], optional): The range for the combined realtime
+            schedule and route comparison data.
         save (bool, optional): whether to save DataFrame to s3.
             Defaults to True.
 
@@ -355,32 +345,33 @@ def main(freq: str = 'D') -> pd.DataFrame:
     schedule_data_list = []
     pbar = tqdm(schedule_feeds)
     for feed in pbar:
+        schedule_version = feed["schedule_version"]
         pbar.set_description(
             f"Generating daily schedule data for "
-            f"schedule version {feed['schedule_version']}"
+            f"schedule version {schedule_version}"
         )
         logging.info(
             f"\nDownloading zip file for schedule version "
-            f"{feed['schedule_version']}"
+            f"{schedule_version}"
         )
-        CTA_GTFS = static_gtfs_analysis.download_zip(feed['schedule_version'])
+        CTA_GTFS = static_gtfs_analysis.download_zip(schedule_version)
         logging.info("\nExtracting data")
-        data = static_gtfs_analysis.GTFSFeed.extract_data(CTA_GTFS)
+        data = static_gtfs_analysis.GTFSFeed.extract_data(
+            CTA_GTFS,
+            version_id=schedule_version
+        )
         data = static_gtfs_analysis.format_dates_hours(data)
-        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+
         logging.info("\nSummarizing trip data")
-        if freq == 'H':
-            route_daily_summary = (
-                static_gtfs_analysis
-                .summarize_and_save(trip_summary, hourly=True, save=False)
-            )
-        else:
-            route_daily_summary = (
-                static_gtfs_analysis
-                .summarize_and_save(trip_summary, hourly=False, save=False)
-            )
+        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+
+        route_daily_summary = (
+            static_gtfs_analysis
+            .summarize_date_rt(trip_summary)
+        )
+
         schedule_data_list.append(
-            {"schedule_version": feed["schedule_version"],
+            {"schedule_version": schedule_version,
              "data": route_daily_summary}
         )
 

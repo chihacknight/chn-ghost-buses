@@ -46,7 +46,8 @@ class GTFSFeed:
     shapes: pd.DataFrame
 
     @classmethod
-    def extract_data(cls, gtfs_zipfile: zipfile.ZipFile) -> GTFSFeed:
+    def extract_data(cls, gtfs_zipfile: zipfile.ZipFile,
+                     version_id: str = None) -> GTFSFeed:
         """Load each text file in zipfile into a DataFrame
 
         Args:
@@ -54,12 +55,16 @@ class GTFSFeed:
                 CTA transit feeds e.g.
                 https://transitfeeds.com/p/chicago-transit-authority/
                 165/20220718/download"
+            version_id (str, optional): The schedule version in use.
+                Defaults to None.
 
         Returns:
             GTFSFeed: A GTFSFeed object containing multiple DataFrames
                 accessible by name.
         """
-        logging.info(f"Extracting data from CTA zipfile version {VERSION_ID}")
+        if version_id is None:
+            version_id = VERSION_ID
+        logging.info(f"Extracting data from CTA zipfile version {version_id}")
         data_dict = {}
         pbar = tqdm(cls.__annotations__.keys())
         for txt_file in pbar:
@@ -230,7 +235,20 @@ def make_trip_summary(data: GTFSFeed) -> pd.DataFrame:
     return trip_summary
 
 
-def group_trips(trip_summary: pd.DataFrame, groupby_vars: list, hourly: bool):
+def group_trips(
+    trip_summary: pd.DataFrame,
+        groupby_vars: list) -> pd.DataFrame:
+    """Generate summary grouped by groupby_vars
+
+    Args:
+        trip_summary (pd.DataFrame): A DataFrame of one trip per row i.e.
+            the output of the make_trip_summary function.
+        groupby_vars (list): Variables to group by.
+
+    Returns:
+        pd.DataFrame: A DataFrame with the trip count by groupby_vars e.g.
+            route and date.
+    """
     trip_summary = trip_summary.copy()
     summary = (
         trip_summary.groupby(by=groupby_vars)
@@ -239,90 +257,36 @@ def group_trips(trip_summary: pd.DataFrame, groupby_vars: list, hourly: bool):
         .reset_index()
     )
 
-    if hourly:
-        summary.rename(
-            columns={
-                "arrival_hour": "hour",
-                "trip_id": "trip_count",
-                "raw_date": "date"},
-            inplace=True,
-        )
-
-    else:
-        summary.rename(
-            columns={
-                "trip_id": "trip_count",
-                "raw_date": "date"},
-            inplace=True
-        )
+    summary.rename(
+        columns={
+            "trip_id": "trip_count",
+            "raw_date": "date"},
+        inplace=True
+    )
     summary.date = summary.date.dt.date
     return summary
 
 
-def summarize_and_save(trip_summary: pd.DataFrame,
-                       hourly: bool = True,
-                       save: bool = True) -> pd.DataFrame:
-    """Get trips by hour, date, and route
+def summarize_date_rt(trip_summary: pd.DataFrame) -> pd.DataFrame:
+    """Summarize trips by date and route
 
     Args:
         trip_summary (pd.DataFrame): a summary of trips with one row per date.
             Output of the make_trip_summary function.
-        hourly: (bool, optional): whether to aggregate by arrival_hour.
-            Defaults to True.
-        save (bool, optional): whether to save to S3 bucket. Defaults to True.
 
     Returns:
-        pd.DataFrame: A DataFrame grouped by date, hour, and route
+        pd.DataFrame: A DataFrame grouped by date and route
     """
     trip_summary = trip_summary.copy()
     groupby_vars = ["raw_date", "route_id"]
 
-    if hourly:
-        groupby_vars.append("arrival_hour")
-        # group to get trips by hour by date by route
-        route_daily_summary = group_trips(
-            trip_summary,
-            groupby_vars=groupby_vars,
-            hourly=hourly
-        )
+    # group to get trips by hour by date by route
+    route_daily_summary = group_trips(
+        trip_summary,
+        groupby_vars=groupby_vars,
+    )
 
-        if save:
-            route_daily_summary.to_csv(
-                f"s3://{BUCKET}/schedule_summaries/route_level"
-                f"/schedule_route_daily_hourly_summary_v{VERSION_ID}.csv",
-                index=False,
-            )
-
-        # group to get trips by hour by date by route by *direction*
-        groupby_vars.append("direction")
-        route_dir_daily_summary = group_trips(
-            trip_summary,
-            groupby_vars=groupby_vars,
-            hourly=hourly
-        )
-
-        if save:
-            route_dir_daily_summary.to_csv(
-                f"s3://{BUCKET}/schedule_summaries/route_dir_level/"
-                f"schedule_route_dir_daily_hourly_summary_v{VERSION_ID}.csv",
-                index=False,
-            )
-
-    else:
-        route_daily_summary = group_trips(
-            trip_summary,
-            groupby_vars=groupby_vars,
-            hourly=hourly
-        )
-
-        groupby_vars.append("direction")
-        route_dir_daily_summary = group_trips(
-            trip_summary,
-            groupby_vars=groupby_vars,
-            hourly=hourly
-        )
-
-        return route_daily_summary
+    return route_daily_summary
 
 
 def make_linestring_of_points(
@@ -364,22 +328,37 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
     return CTA_GTFS
 
 
-def main() -> None:
+def main(version_id: str = None) -> geopandas.GeoDataFrame:
     """Download data from CTA, construct shapes from shape data,
     and save to geojson file
+
+    Args:
+        version_id (str, optional): The schedule version to use.
+            Defaults to None.
+
+    Returns:
+        geopandas.GeoDataFrame: DataFrame with route shapes
     """
-    CTA_GTFS = download_zip(VERSION_ID)
-    data = GTFSFeed.extract_data(CTA_GTFS)
+    if version_id is None:
+        version_id = VERSION_ID
+
+    CTA_GTFS = download_zip(version_id)
+    data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
     data = format_dates_hours(data)
 
     # check that there are no dwell periods that cross hour boundary
-    data.stop_times[data.stop_times.arrival_hour !=
-                    data.stop_times.departure_hour]
+    cross_hr_bndary = (
+        data.stop_times[data.stop_times.arrival_hour !=
+                        data.stop_times.departure_hour]
+    )
+    if not cross_hr_bndary.empty:
+        logging.warn(
+            f"There are dwell periods that cross "
+            f"the hour boundary. See {cross_hr_bndary}")
 
     trip_summary = make_trip_summary(data)
 
-    trip_summary.head()
-    summarize_and_save(trip_summary, save=False)
+    summarize_date_rt(trip_summary)
 
     # ## Most common shape by route
 
@@ -440,6 +419,7 @@ def main() -> None:
     )
     with open(str(save_path), "w") as f:
         f.write(final_gdf.loc[(final_gdf["route_type"] == "3")].to_json())
+
     logging.info(f'geojson saved to {save_path}')
     return final_gdf
 

@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import List
 
 import boto3
 import json
@@ -20,7 +21,7 @@ logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
 
 
-def combine_daily_files(date: str):
+def combine_daily_files(date: str, bucket_list: List[str]):
     """Combine raw JSON files returned by API into daily CSVs. 
 
     Args:
@@ -28,7 +29,7 @@ def combine_daily_files(date: str):
     """
     s3 = boto3.resource("s3")
 
-    for bucket_name in [BUCKET_PRIVATE, BUCKET_PUBLIC]:
+    for bucket_name in bucket_list:
         logging.info(f"processing data from {bucket_name}")
         bucket = s3.Bucket(bucket_name)
         objects = bucket.objects.filter(Prefix=f"bus_data/{date}")
@@ -104,4 +105,4 @@ def combine_daily_files(date: str):
 
 def lambda_handler(event, context):
     date = pendulum.yesterday("America/Chicago").to_date_string()
-    combine_daily_files(date)
+    combine_daily_files(date, [BUCKET_PRIVATE, BUCKET_PUBLIC])

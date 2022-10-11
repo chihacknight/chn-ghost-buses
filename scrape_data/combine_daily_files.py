@@ -71,8 +71,8 @@ def combine_daily_files(date: str):
                 new_data["scrape_file"] = obj_name
                 new_errors["scrape_file"] = obj_name
 
-                data_list.append(new_data)
-                errors_list.append(new_errors)
+            data_list.append(new_data)
+            errors_list.append(new_errors)
 
         data = pd.concat(data_list, ignore_index=True)
         errors = pd.concat(errors_list, ignore_index=True)

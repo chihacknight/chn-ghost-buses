@@ -1,10 +1,6 @@
-import os
-from typing import Tuple
 import logging
 
 import boto3
-import json
-import pandas as pd
 import pendulum
 from tqdm import tqdm
 import typer

@@ -39,3 +39,62 @@ There are a few types of data available in the public S3 bucket. The **data** li
         * These files are generated daily between 10 and 11am Central for the prior day. There is one file per full day from `2022-05-20` until the day before you are making the request. So, if you are checking on `2022-10-02` after 11am Central, errors will be available up to and including `2022-10-01`.
         * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_errors_v2`. Full filenames are like `bus_full_day_errors_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv(https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_errors_v2/2022-10-01.csv)`.
 
+
+    ## Script to load data
+
+    The following code will work to load all available data. To change the date range, enter the `START_DATE` and `END_DATE` parameters in `YYYY-MM-DD` format. Note that one day of weekday data is about 28 MB. The script can take some time to run depending on how many days you are loading. 
+
+    ```
+    BUCKET = "public"
+    START_DATE = "2022-05-20"
+    END_DATE = ""
+
+    import pendulum
+    import pandas as pd
+
+
+    BUCKET_URL = f"https://chn-ghost-buses-{BUCKET}.s3.us-east-2.amazonaws.com"
+
+    start_date = pendulum.from_format(START_DATE, 'YYYY-MM-DD', tz = "America/Chicago")
+
+    if END_DATE:
+        end_date = pendulum.from_format(END_DATE, 'YYYY-MM-DD', tz = "America/Chicago")
+    else:
+        if pendulum.now("America/Chicago").hour >= 11:
+            end_date = pendulum.yesterday("America/Chicago")
+        else: 
+            end_date = pendulum.now("America/Chicago").subtract(days=2)
+
+    date_list = [d.to_date_string()
+            for d in pendulum.period(
+                start_date,
+                end_date
+            ).range("days")
+        ]
+
+    data_list = []
+    errors_list = []
+
+    for d in date_list:
+
+        url = BUCKET_URL + f"/bus_full_day_data_v2/{d}.csv"
+        print(f"{pendulum.now()}: processing {d} data")
+        daily_data = pd.read_csv(
+                url,
+                low_memory=False
+            )
+
+        data_list.append(daily_data)
+        
+        print(f"{pendulum.now()}: processing {d} errors")
+        daily_errors = pd.read_csv(
+                (BUCKET_URL + f"/bus_full_day_errors_v2/{d}.csv"),
+                low_memory=False
+            )
+
+        errors_list.append(daily_errors)
+
+    data = pd.concat(data_list)
+    errors = pd.concat(errors_list)
+    ```
+

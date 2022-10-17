@@ -1,14 +1,18 @@
+import os
+from dataclasses import dataclass, field
 from typing import List
 import logging
 
 # required for pandas to read csv from aws
 import s3fs
-import os
 from s3path import S3Path
 import pandas as pd
 import pendulum
 from tqdm import tqdm
 from dotenv import load_dotenv
+
+import static_gtfs_analysis
+
 
 load_dotenv()
 
@@ -22,23 +26,169 @@ SCHEDULE_RT_PATH = BASE_PATH / "schedule_rt_comparisons" / "route_level"
 SCHEDULE_SUMMARY_PATH = BASE_PATH / "schedule_summaries" / "route_level"
 
 
+@dataclass
+class AggInfo:
+    """A class for storing information about
+        aggregation of route and schedule data
+
+    Args:
+        freq (str, optional): An offset alias described in the Pandas
+            time series docs. Defaults to None.
+            https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+        aggvar (str, optional): variable to aggregate by.
+            Defaults to trip_count
+        byvars (List[str], optional): variables to passed to
+            pd.DataFrame.groupby. Defaults to ['date', 'route_id'].
+    """
+    freq: str = 'D'
+    aggvar: str = 'trip_count'
+    byvars: List[str] = field(default_factory=lambda: ['date', 'route_id'])
+
+
+def make_daily_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Make a summary of trips that actually happened. The result will be
+        used as base data for further aggregations.
+
+    Args:
+        df (pd.DataFrame): A DataFrame read from bus_full_day_data_v2/{date}.
+
+    Returns:
+        pd.DataFrame: A summary of full day data by
+            date, route, and destination.
+    """
+    df = df.copy()
+    df = (
+        df.groupby(["data_date", "rt", "des"])
+        .agg({"vid": set, "tatripid": set, "tablockid": set})
+        .reset_index()
+    )
+    df["vh_count"] = df["vid"].apply(len)
+    df["trip_count"] = df["tatripid"].apply(len)
+    df["block_count"] = df["tablockid"].apply(len)
+    return df
+
+
+def sum_by_frequency(
+    df: pd.DataFrame,
+        agg_info: AggInfo) -> pd.DataFrame:
+    """Calculate total trips per route per frequency
+
+    Args:
+        df (pd.DataFrame): A DataFrame of route or scheduled route data
+        agg_info (AggInfo): An AggInfo object describing how data
+            is to be aggregated.
+
+    Returns:
+        pd.DataFrame: A DataFrame with the total number of trips per route
+            by a specified frequency.
+    """
+    df = df.copy()
+    return (
+        df.set_index(agg_info.byvars)
+        .groupby(
+            [pd.Grouper(level='date', freq=agg_info.freq),
+                pd.Grouper(level='route_id')])[agg_info.aggvar]
+        .sum().reset_index()
+    )
+
+
+def sum_trips_by_rt_by_freq(
+    rt_df: pd.DataFrame,
+    sched_df: pd.DataFrame,
+    agg_info: AggInfo,
+        my_range: List[str] = ["2022-05-31", "2022-07-04"]) -> pd.DataFrame:
+    """Calculate ratio of trips to scheduled trips per route
+       per specified frequency.
+
+    Args:
+        rt_df (pd.DataFrame): A DataFrame of daily route data
+        sched_df (pd.DataFrame): A DataFrame of daily scheduled route data
+        agg_info (AggInfo): An AggInfo object describing how data
+            is to be aggregated.
+        my_range (List[str], optional): The date range of schedule data.
+            Defaults to ["2022-05-31", "2022-07-04"].
+
+    Returns:
+        pd.DataFrame: DataFrame with the total number of trips per route
+            by specified frequency and the ratio of actual trips to
+            scheduled trips.
+    """
+
+    rt_df = rt_df.copy()
+    sched_df = sched_df.copy()
+
+    rt_freq_by_rte = sum_by_frequency(
+        rt_df,
+        agg_info=agg_info
+    )
+
+    sched_freq_by_rte = sum_by_frequency(
+        sched_df,
+        agg_info=agg_info
+    )
+
+    compare_freq_by_rte = rt_freq_by_rte.merge(
+        sched_freq_by_rte,
+        how="inner",
+        on=["date", "route_id"],
+        suffixes=["_rt", "_sched"],
+    )
+
+    # compare by day of week
+    compare_freq_by_rte["dayofweek"] = (
+        compare_freq_by_rte["date"]
+        .dt.dayofweek
+    )
+    compare_freq_by_rte["day_type"] = (
+        compare_freq_by_rte["dayofweek"].map(
+            {0: "wk", 1: "wk", 2: "wk", 3: "wk",
+                4: "wk", 5: "sat", 6: "sun"})
+    )
+    compare_freq_by_rte.loc[
+        compare_freq_by_rte.date.isin(
+            [my_range[0], my_range[1]]), "day_type"
+    ] = "hol"
+
+    compare_by_day_type = (
+        compare_freq_by_rte.groupby(["route_id", "day_type"])[
+            ["trip_count_rt", "trip_count_sched"]
+        ]
+        .sum()
+        .reset_index()
+    )
+
+    compare_by_day_type["ratio"] = (
+        compare_by_day_type["trip_count_rt"]
+        / compare_by_day_type["trip_count_sched"]
+    )
+
+    return compare_by_day_type
+
+
 # Read in pre-computed files of RT and scheduled data and compare!
 def combine_real_time_rt_comparison(
     schedule_feeds: List[dict],
+    schedule_data_list: List[dict],
+    agg_info: AggInfo,
     my_range: List[str] = ["2022-05-31", "2022-07-04"],
-    save: bool = True,
-) -> pd.DataFrame:
+        save: bool = True) -> pd.DataFrame:
     """Generate a combined DataFrame with the realtime route comparisons
 
     Args:
         schedule_feeds (List[dict]): A list of dictionaries with the keys
              "schedule_version", "feed_start_date", and "feed_end_date"
-        my_range (List[str], optional): A custom date range for trips..
+        schedule_data_list (List[dict]): A list of dictionaries with a
+            "schedule_version" key and "data" key with a value corresponding to
+            the daily route summary for that version.
+        agg_info (AggInfo): An AggInfo object describing how data
+            is to be aggregated.
+        my_range (List[str], optional): A custom date range for trips.
             Defaults to ['2022-05-31', '2022-07-04'].
         save (bool, optional): whether to save the csv file to s3 bucket.
 
     Returns:
-        pd.DataFrame: _description_
+        pd.DataFrame: Combined DataFrame of various schedule versions
+            with totals per route by a specified frequency.
     """
     combined = pd.DataFrame()
     pbar = tqdm(schedule_feeds)
@@ -55,10 +205,13 @@ def combine_real_time_rt_comparison(
         pbar.set_description(
             f"Loading schedule version {feed['schedule_version']}"
         )
-        schedule_raw = pd.read_csv(
-            (SCHEDULE_SUMMARY_PATH /
-             f'schedule_route_daily_hourly_summary_v'
-             f'{feed["schedule_version"]}.csv').as_uri())
+
+        schedule_raw = (
+            next(
+                data_dict["data"] for data_dict in schedule_data_list
+                if feed["schedule_version"] == data_dict["schedule_version"]
+            )
+        )
 
         rt_raw = pd.DataFrame()
         date_pbar = tqdm(date_range)
@@ -68,9 +221,17 @@ def combine_real_time_rt_comparison(
                 f"Processing {date_str} at"
                 f"{pendulum.now().to_datetime_string()}"
             )
+
+            # Use low_memory option to avoid warning about columns
+            # with mixed dtypes.
             daily_data = pd.read_csv(
-                (BASE_PATH / f"bus_hourly_summary_v2/{date_str}.csv").as_uri()
+                (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
+                .as_uri(),
+                low_memory=False
             )
+
+            daily_data = make_daily_summary(daily_data)
+
             rt_raw = pd.concat([rt_raw, daily_data])
 
         # basic reformatting
@@ -80,50 +241,11 @@ def combine_real_time_rt_comparison(
         rt["route_id"] = rt["rt"]
         schedule["date"] = pd.to_datetime(schedule.date, format="%Y-%m-%d")
 
-        # get total by route by day
-        rt_daily_by_rte = (
-            rt.groupby(by=["date", "route_id"])["trip_count"]
-            .sum()
-            .reset_index()
-        )
-        sched_daily_by_rte = (
-            schedule.groupby(by=["date", "route_id"])["trip_count"].sum()
-            .reset_index()
-        )
-
-        compare_daily_by_rte = rt_daily_by_rte.merge(
-            sched_daily_by_rte,
-            how="inner",
-            on=["date", "route_id"],
-            suffixes=["_rt", "_sched"],
-        )
-
-        # compare by day of week
-        compare_daily_by_rte["dayofweek"] = (
-            compare_daily_by_rte["date"]
-            .dt.dayofweek
-        )
-        compare_daily_by_rte["day_type"] = (
-            compare_daily_by_rte["dayofweek"].map(
-                {0: "wk", 1: "wk", 2: "wk", 3: "wk",
-                 4: "wk", 5: "sat", 6: "sun"})
-        )
-        compare_daily_by_rte.loc[
-            compare_daily_by_rte.date.isin(
-                [my_range[0], my_range[1]]), "day_type"
-        ] = "hol"
-
-        compare_by_day_type = (
-            compare_daily_by_rte.groupby(["route_id", "day_type"])[
-                ["trip_count_rt", "trip_count_sched"]
-            ]
-            .sum()
-            .reset_index()
-        )
-
-        compare_by_day_type["ratio"] = (
-            compare_by_day_type["trip_count_rt"]
-            / compare_by_day_type["trip_count_sched"]
+        compare_by_day_type = sum_trips_by_rt_by_freq(
+            rt_df=rt,
+            sched_df=schedule,
+            agg_info=agg_info,
+            my_range=my_range
         )
 
         if save:
@@ -146,18 +268,18 @@ def combine_real_time_rt_comparison(
 def build_summary(
     combined_df: pd.DataFrame,
     date_range: List[str] = ["2022-05-20", "2022-07-20"],
-    save: bool = True,
-) -> pd.DataFrame:
+        save: bool = True) -> pd.DataFrame:
     """Create a summary by route and day type
 
     Args:
         combined_df (pd.DataFrame): A DataFrame with all schedule versions
-        date_range (List[str]):
+        date_range (List[str], optional): The range for the combined realtime
+            schedule and route comparison data.
         save (bool, optional): whether to save DataFrame to s3.
             Defaults to True.
 
     Returns:
-        pd.DataFrame: A DataFrame summary with the
+        pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
     combined_df = combined_df.copy(deep=True)
@@ -183,7 +305,15 @@ def build_summary(
     return summary
 
 
-def main():
+def main(freq: str = 'D') -> pd.DataFrame:
+    """Calculate the summary by route and day across multiple schedule versions
+
+    Args:
+        freq (str): Frequency of aggregation. Defaults to Daily.
+    Returns:
+        pd.DataFrame: A DataFrame summary across
+            versioned schedule comparisons.
+    """
     schedule_feeds = [
         {
             "schedule_version": "20220507",
@@ -212,7 +342,45 @@ def main():
         },
     ]
 
-    combined_df = combine_real_time_rt_comparison(schedule_feeds, save=False)
+    schedule_data_list = []
+    pbar = tqdm(schedule_feeds)
+    for feed in pbar:
+        schedule_version = feed["schedule_version"]
+        pbar.set_description(
+            f"Generating daily schedule data for "
+            f"schedule version {schedule_version}"
+        )
+        logging.info(
+            f"\nDownloading zip file for schedule version "
+            f"{schedule_version}"
+        )
+        CTA_GTFS = static_gtfs_analysis.download_zip(schedule_version)
+        logging.info("\nExtracting data")
+        data = static_gtfs_analysis.GTFSFeed.extract_data(
+            CTA_GTFS,
+            version_id=schedule_version
+        )
+        data = static_gtfs_analysis.format_dates_hours(data)
+
+        logging.info("\nSummarizing trip data")
+        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+
+        route_daily_summary = (
+            static_gtfs_analysis
+            .summarize_date_rt(trip_summary)
+        )
+
+        schedule_data_list.append(
+            {"schedule_version": schedule_version,
+             "data": route_daily_summary}
+        )
+
+    agg_info = AggInfo(freq=freq)
+    combined_df = combine_real_time_rt_comparison(
+        schedule_feeds,
+        schedule_data_list=schedule_data_list,
+        agg_info=agg_info,
+        save=False)
     return build_summary(combined_df, save=False)
 
 

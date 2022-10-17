@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import List, Optional
 
 import boto3
 import json
@@ -20,7 +21,7 @@ logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
 
 
-def combine_daily_files(date: str):
+def combine_daily_files(date: str, bucket_list: List[str], save: Optional[str] = None):
     """Combine raw JSON files returned by API into daily CSVs. 
 
     Args:
@@ -28,7 +29,7 @@ def combine_daily_files(date: str):
     """
     s3 = boto3.resource("s3")
 
-    for bucket_name in [BUCKET_PRIVATE, BUCKET_PUBLIC]:
+    for bucket_name in bucket_list:
         logging.info(f"processing data from {bucket_name}")
         bucket = s3.Bucket(bucket_name)
         objects = bucket.objects.filter(Prefix=f"bus_data/{date}")
@@ -77,13 +78,22 @@ def combine_daily_files(date: str):
         data = pd.concat(data_list, ignore_index=True)
         errors = pd.concat(errors_list, ignore_index=True)
 
+        logging.info(f"found {len(errors)} errors and {len(data)} data points for {date}")
+
         if len(errors) > 0:
-            error_key = f"bus_full_day_errors_v2/{date}.csv"
-            logging.info(f"saving errors to {bucket}/{error_key}")
-            bucket.put_object(
-                Body=errors.to_csv(index=False),
-                Key=error_key,
-            )
+            if save == "bucket":
+                error_key = f"bus_full_day_errors_v2/{date}.csv"
+                logging.info(f"saving errors to {bucket}/{error_key}")
+                bucket.put_object(
+                    Body=errors.to_csv(index=False),
+                    Key=error_key,
+                )
+            if save == "local":
+                local_filename = f"ghost_buses_full_day_errors_from_{bucket.name}_{date}.csv"
+                logging.info(f"saving errors to {local_filename}")
+                errors.to_csv(local_filename, index = False)
+        else:
+            logging.info(f"no errors found for {date}, not saving any error file")
 
         if len(data) > 0:
             # convert data time to actual datetime
@@ -93,15 +103,22 @@ def combine_daily_files(date: str):
 
             data["data_hour"] = data.data_time.dt.hour
             data["data_date"] = data.data_time.dt.date
+            if save == "bucket":
+                data_key = f"bus_full_day_data_v2/{date}.csv"
+                logging.info(f"saving data to {bucket}/{data_key}")
+                bucket.put_object(
+                    Body=data.to_csv(index=False),
+                    Key=data_key,
+                )
+            if save == "local":
+                local_filename = f"ghost_buses_full_day_data_from_{bucket.name}_{date}.csv"
+                logging.info(f"saving errors to {local_filename}")
+                data.to_csv(local_filename, index = False)
+        else:
+            logging.info(f"no data found for {date}, not saving any data file")
 
-            data_key = f"bus_full_day_data_v2/{date}.csv"
-            logging.info(f"saving data to {bucket}/{data_key}")
-            bucket.put_object(
-                Body=data.to_csv(index=False),
-                Key=data_key,
-            )
-
+    return data, errors
 
 def lambda_handler(event, context):
     date = pendulum.yesterday("America/Chicago").to_date_string()
-    combine_daily_files(date)
+    data, errors = combine_daily_files(date, [BUCKET_PRIVATE, BUCKET_PUBLIC], save = "bucket")

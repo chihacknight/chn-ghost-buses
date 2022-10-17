@@ -89,7 +89,7 @@ def combine_daily_files(date: str, bucket_list: List[str], save: Optional[str] =
                     Key=error_key,
                 )
             if save == "local":
-                local_filename = f"ghost_buses_full_day_errors_from_{bucket}_{date}.csv"
+                local_filename = f"ghost_buses_full_day_errors_from_{bucket.name}_{date}.csv"
                 logging.info(f"saving errors to {local_filename}")
                 errors.to_csv(local_filename, index = False)
         else:
@@ -111,15 +111,14 @@ def combine_daily_files(date: str, bucket_list: List[str], save: Optional[str] =
                     Key=data_key,
                 )
             if save == "local":
-                local_filename = f"ghost_buses_full_day_data_from_{bucket}_{date}.csv"
+                local_filename = f"ghost_buses_full_day_data_from_{bucket.name}_{date}.csv"
                 logging.info(f"saving errors to {local_filename}")
                 data.to_csv(local_filename, index = False)
         else:
             logging.info(f"no data found for {date}, not saving any data file")
 
-def add_daily_data_to_combined_file(content: pd.DataFrame, )
-
+    return data, errors
 
 def lambda_handler(event, context):
     date = pendulum.yesterday("America/Chicago").to_date_string()
-    combine_daily_files(date, [BUCKET_PRIVATE, BUCKET_PUBLIC], save = "bucket")
+    data, errors = combine_daily_files(date, [BUCKET_PRIVATE, BUCKET_PUBLIC], save = "bucket")

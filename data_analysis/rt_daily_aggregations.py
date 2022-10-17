@@ -18,7 +18,9 @@ logging.basicConfig(level=logging.INFO)
 def combine_daily_totals(
     start_date: str = typer.Argument(..., help = "Start date in format YYYY-MM-DD. Acceptable dates are any date between 2022-05-19 and yesterday (so, if today is 2022-10-11, can input any date up to 2022-10-10. Must be before end date."), 
     end_date: str =  typer.Argument(..., help = "End date in format YYYY-MM-DD. Acceptable dates are any date between 2022-05-19 and yesterday (so, if today is 2022-10-11, can input any date up to 2022-10-10. Must be after start date."), 
-    bucket_type: str = typer.Argument(..., help = "Either 'public' or 'private' -- bucket to read data from. User running must have read access to the bucket in question, so general users should list 'public'.")):
+    bucket_type: str = typer.Argument(..., help = "Either 'public' or 'private' -- bucket to read data from. User running must have read access to the bucket in question, so general users should list 'public'."),
+    save: str = typer.Argument(..., help = "Optional string 'bucket' or 'local' indicating whether you want to save your combined files in the bucket they're being read from or locally. If empty, files will not be saved.")
+    ):
     """
     Take all the raw JSON files for each date in a date range from one of the CHN ghost buses S3 buckets (private or public)
     and aggregate them into daily CSV files.
@@ -35,8 +37,9 @@ def combine_daily_totals(
 
     pbar = tqdm(date_range)
     for day in pbar:
-        combine_daily_files.combine_daily_files(day.to_date_string(), [f'chn-ghost-buses-{bucket_type}'])
+        data, errors = combine_daily_files.combine_daily_files(day.to_date_string(), [f'chn-ghost-buses-{bucket_type}'], save)
 
-
+# can run from the root of the repo like:
+# python3 -m data_analysis.rt_daily_aggregations <start_date> <end_date> <bucket_name> <save>
 if __name__ == "__main__":
     app()

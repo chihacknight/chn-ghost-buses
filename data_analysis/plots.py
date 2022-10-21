@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from pathlib import Path
 from typing import Union
@@ -9,6 +10,7 @@ import logging
 import folium
 import geopandas as gpd
 import pandas as pd
+import numpy as np
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -27,9 +29,46 @@ project_dir = next(
     if p.name == f'{project_name}'
 )
 PLOTS_PATH = project_dir / 'plots' / 'scratch'
+DATA_PATH = project_dir / 'data_output' / 'scratch'
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
+
+
+# https://stackoverflow.com/questions/52503899/
+# format-round-numerical-legend-label-in-geopandas
+def legend_formatter(
+    df: gpd.GeoDataFrame,
+    var: str,
+        decimals: str = '0f') -> List[str]:
+    """Format the bounds for categorical variable to remove brackets
+        and add comma separators for large numbers
+
+    Args:
+        df (gpd.GeoDataFrame): data containing routes and GPS coordinates
+        var (str): variable of interest to be plotted.
+        decimals (str, optional): Number of decimal places 
+            for the number display. Defaults to 0f (0 places).
+
+    Returns:
+        List[str]: A list of formatted bounds to be placed in legend.
+    """
+    df = df.copy()
+    q5 = mapclassify.Quantiles(df[var], k=5)
+    upper_bounds = q5.bins
+    bounds = []
+    for index, upper_bound in enumerate(upper_bounds):
+        if index == 0:
+            lower_bound = df[var].min()
+        else:
+            lower_bound = upper_bounds[index-1]
+        if np.isnan(upper_bound):
+            upper_bound = df[var].max()
+
+        # format the numerical legend here
+        bound = f'{lower_bound:,.{decimals}} - {upper_bound:,.{decimals}}'
+        bounds.append(bound)
+    return bounds
 
 
 def n_worst_best_routes(
@@ -92,7 +131,9 @@ def boxplot(
     if save:
         if save_name is None:
             save_name = f'boxplot_of_{y}_by_{x}'
-        save_path = str(PLOTS_PATH / f'{save_name}.png')
+        save_path = str(
+            PLOTS_PATH / f'{save_name}'
+            f'_{datetime.now().strftime("%Y-%m-%d")}.png')
         logger.info(f'Saving {save_path}')
         fig.get_figure().savefig(save_path)
 
@@ -121,62 +162,183 @@ def plot_map(
         folium.Map: A map of bus routes colored by a target variable.
     """
     geo_df = geo_df.copy()
-    newmap = geo_df.explore(
-        column=var,
-        cmap=cmap,
-        m=background_map,
-        legend=True)
+    # Convert dates to strings. Folium cannot handle datetime
+    date_columns = geo_df.select_dtypes(include=["datetime64"]).columns
+    geo_df[date_columns] = geo_df[date_columns].astype(str)
+    newmap = geo_df.explore(**kwargs)
     if save:
-        save_path = str(PLOTS_PATH / f'{save_name}_{var}.html')
+        save_path = str(
+            PLOTS_PATH / f'{save_name}_{kwargs["column"]}'
+            f'_{datetime.now().strftime("%Y-%m-%d")}.html')
         logger.info(f'Saving {save_path}')
         newmap.save(save_path)
     return newmap
 
 
-def main() -> None:
-    """Generate boxplot, maps of all routes, top 10 best routes, and
-    top 10 worst routes
-    """
-    summary_df = compare_scheduled_and_rt.main()
+def create_ridership_map():
+    ridership_by_rte = pd.read_csv(
+        "https://data.cityofchicago.org/api/views/"
+        "jyb9-n7fm/rows.csv?accessType=DOWNLOAD")
+    ridership_by_rte.date = pd.to_datetime(
+        ridership_by_rte.date,
+        infer_datetime_format=True
+    )
+    ridership_by_rte_date = (
+        ridership_by_rte.set_index(['date', 'route']).groupby(
+            [pd.Grouper(level='date', freq='A-MAY'),
+             pd.Grouper(level='route')]
+        ).sum().reset_index()
+    )
+    ridership_by_rte_date.rename(columns={'route': 'route_id'}, inplace=True)
 
     gdf = static_gtfs_analysis.main()
+
+    rider_gdf = ridership_by_rte_date.merge(gdf, on="route_id")
+
+    rider_gdf2022 = rider_gdf.loc[rider_gdf.date.dt.year == 2022]
+    rider_gdf2022_geo = gpd.GeoDataFrame(rider_gdf2022)
+
+    # Background map must be re-created to get a clear map between runs
+    chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
+    bounds = legend_formatter(rider_gdf2022_geo, "rides")
+    kwargs = {
+        "cmap": "plasma",
+        "column": "rides",
+        "scheme": "Quantiles",
+        "m": chicago_map,
+        "legend_kwds": {
+            'caption': 'Number of Riders',
+            'colorbar': False,
+            'labels': bounds
+        },
+        "legend": True,
+        "categorical": False,
+        "k": 5}
+
+    _ = plot_map(
+        rider_gdf2022_geo,
+        save_name='all_routes_categorical_2022-01-03_to_2022-05-31',
+        **kwargs
+    )
+
+    # Remove key from kwargs
+    kwargs.pop('scheme', None)
+    kwargs.pop('k', None)
+    kwargs['legend_kwds'].pop('labels', None)
+    # Dictionary keys are popped when passed to explore,
+    # so must be added again.
+    kwargs['legend_kwds']['caption'] = 'Number of Riders'
+    kwargs['legend_kwds']['max_labels'] = 4
+    kwargs['legend_kwds']['colorbar'] = True
+    chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
+    kwargs['m'] = chicago_map
+
+    _ = plot_map(
+        rider_gdf2022_geo,
+        save_name='all_routes_numeric_2022-01-03_to_2022-05-31',
+        **kwargs
+    )
+
+
+def main() -> None:
+    """Generate boxplot, maps of all routes, top 10 best routes, and
+    top 10 worst routes. Map of ridership
+    """
+    gdf = static_gtfs_analysis.main()
+
+    summary_df = compare_scheduled_and_rt.main(freq='D')
 
     summary_gdf = summary_df.merge(gdf, how="right", on="route_id")
 
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
     boxplot(x="day_type", y="ratio", data=summary_df, xlabel="Day Type",
-            ylabel="Proportion of trips that occurred vs schedule")
+            ylabel="Proportion of trips that occurred vs schedule",
+            xtickslabels=['holiday', 'weekday', 'sat', 'sun'])
 
-    # Background map must be re-created to get a clear map between runs
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
-    plot_map(
-        summary_gdf_geo,
-        cmap='plasma',
-        var="ratio",
-        save_name="all_routes",
-        background_map=chicago_map
-    )
+    summary_kwargs = {
+        "cmap": "plasma",
+        "column": "ratio",
+        "m": chicago_map,
+        "legend_kwds": {"caption": "Ratio of Actual Trips to Scheduled Trips"},
+        "legend": True,
+    }
+    _ = plot_map(
+            summary_gdf_geo,
+            save_name="all_routes_2022-05-20_to_2022-07-20",
+            **summary_kwargs
+        )
 
+    # Quantile plot
+    bounds = legend_formatter(summary_gdf_geo, "ratio", decimals="2f")
+    chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
+    summary_kwargs_quantiles = {
+        "cmap": "plasma",
+        "column": "ratio",
+        "scheme": "Quantiles",
+        "m": chicago_map,
+        "legend_kwds": {
+            'caption': "Ratio of Actual Trips to Scheduled Trips",
+            'colorbar': False,
+            'labels': bounds
+        },
+        "legend": True,
+        "categorical": False,
+        "k": 5
+    }
+
+    _ = plot_map(
+            summary_gdf_geo,
+            save_name='all_routes_quantiles_2022-05-20_to_2022-07-20',
+            **summary_kwargs_quantiles
+        )
+
+    
     # Worst performing routes
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
     worst_geo = n_worst_best_routes(summary_gdf_geo)
-    plot_map(
-        worst_geo,
-        cmap='winter',
-        var="ratio",
-        background_map=chicago_map,
-        save_name="worst_routes"
+    worst_geo.to_file(
+        str(DATA_PATH / 'worst_routes_2022-05-20'
+            '_to_2022-07-20.geojson'), driver="GeoJSON"
     )
+    summary_kwargs['legend_kwds'] = {
+        "caption": "Ratio of Actual Trips to Scheduled Trips"
+    }
+    summary_kwargs['cmap'] = 'winter'
+    summary_kwargs['m'] = chicago_map
+    _ = plot_map(
+            worst_geo,
+            save_name="worst_routes_2022-05-20_to_2022-07-20",
+            **summary_kwargs
+        )
 
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
     best_geo = n_worst_best_routes(summary_gdf_geo, worst=False)
-    plot_map(
-        best_geo,
-        cmap='winter',
-        var="ratio",
-        background_map=chicago_map,
-        save_name="best_routes"
+    best_geo.to_file(
+        str(DATA_PATH / 'best_routes_2022-05-20'
+            '_to_2022-07-20.geojson'), driver="GeoJSON"
+    )
+
+    summary_kwargs['legend_kwds'] = {
+        "caption": "Ratio of Actual Trips to Scheduled Trips"
+    }
+    summary_kwargs['m'] = chicago_map
+    _ = plot_map(
+            best_geo,
+            save_name="best_routes_2022-05-20_to_2022-07-20",
+            **summary_kwargs
+        )
+    # Save JSON with the quantiles. Note that the plotting function cannot
+    # handle Interval types. It must be cast to string with astype(str)
+    summary_gdf_geo['quantiles'] = pd.qcut(
+        summary_gdf_geo['ratio'],
+        q=5
+    ).astype(str)
+
+    summary_gdf_geo.to_file(
+        str(DATA_PATH / 'all_routes_2022-05-20'
+            '_to_2022-07-20.geojson'), driver='GeoJSON'
     )
 
 

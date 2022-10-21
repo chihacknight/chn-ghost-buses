@@ -1,7 +1,7 @@
 from datetime import datetime
 import os
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 import matplotlib
 matplotlib.use('QtAgg')
@@ -11,6 +11,7 @@ import folium
 import geopandas as gpd
 import pandas as pd
 import numpy as np
+import mapclassify
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -74,6 +75,7 @@ def legend_formatter(
 def n_worst_best_routes(
     df: Union[pd.DataFrame, gpd.GeoDataFrame],
     n: int = 10,
+    percentile: bool = True,
         worst: bool = True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """Returns the n route_ids with the lowest or highest ratio
        of completed trips
@@ -82,6 +84,8 @@ def n_worst_best_routes(
         df (Union[pd.DataFrame, gpd.GeoDataFrame]): DataFrame with ratio
             of completed trips by route_id
         n (int, optional): number of route_ids to return . Defaults to 10.
+        percentile (bool, optional): whether to return routes at a
+            certain percentile rank. Defaults to True.
         worst (bool, optional): whether to return the lowest ratios.
             Defaults to True.
     Returns:
@@ -89,13 +93,33 @@ def n_worst_best_routes(
             n worst or best routes.
     """
     df = df.copy()
+    if percentile:
+        if n > 100 or n <= 0:
+            raise ValueError("The accepted values for n are 0 < n <= 100")
+
     if worst:
-        return df.sort_values(by="ratio").drop_duplicates(['route_id']).head(n)
+        if percentile:
+            return (
+                df.drop_duplicates(['route_id'])
+                .loc[df['percentiles'] <= n/100]
+            )
+        else:
+            return (
+                df.sort_values(by="ratio")
+                .drop_duplicates(['route_id'])
+                .head(n)
+            )
     else:
-        return (
-            df.sort_values(by="ratio", ascending=False)
-            .drop_duplicates(['route_id']).head(n)
-        )
+        if percentile:
+            return (
+                df.drop_duplicates(['route_id'])
+                .loc[df['percentiles'] >= (100-n)/100]
+            )
+        else:
+            return (
+                df.sort_values(by="ratio", ascending=False)
+                .drop_duplicates(['route_id']).head(n)
+            )
 
 
 def boxplot(
@@ -140,22 +164,17 @@ def boxplot(
 
 def plot_map(
     geo_df: gpd.GeoDataFrame,
-    var: str,
     save_name: str,
-    cmap: str = None,
-    background_map: folium.Map = None,
+    kwargs: dict,
         save: bool = True) -> folium.Map:
     """ Create a map of bus routes from GeoDataFrame
 
     Args:
         geo_df (gpd.GeoDataFrame): DataFrame with bus routes, GPS coordinates,
            and some variable of interest e.g. ratio
-        var (str): the variable of interest for a color scale e.g. ratio
         save_name (str): The name of the saved output map.
-        cmap (str, optional): The color map to use for coloring the
-           variable of interest. Defaults to None.
-        background_map (folium.Map, optional): The background map for the
-           bus routes in the DataFrame. Defaults to None.
+        kwargs (dict): A dictionary of keyword arguments passed
+            to GeoDataFrame.explore
         save (bool, optional): Whether to save the map. Defaults to True.
 
     Returns:
@@ -252,6 +271,8 @@ def main() -> None:
 
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
+    summary_gdf_geo['percentiles'] = summary_gdf_geo['ratio'].rank(pct=True)
+
     boxplot(x="day_type", y="ratio", data=summary_df, xlabel="Day Type",
             ylabel="Proportion of trips that occurred vs schedule",
             xtickslabels=['holiday', 'weekday', 'sat', 'sun'])
@@ -329,12 +350,6 @@ def main() -> None:
             save_name="best_routes_2022-05-20_to_2022-07-20",
             **summary_kwargs
         )
-    # Save JSON with the quantiles. Note that the plotting function cannot
-    # handle Interval types. It must be cast to string with astype(str)
-    summary_gdf_geo['quantiles'] = pd.qcut(
-        summary_gdf_geo['ratio'],
-        q=5
-    ).astype(str)
 
     summary_gdf_geo.to_file(
         str(DATA_PATH / 'all_routes_2022-05-20'

@@ -100,25 +100,20 @@ def n_worst_best_routes(
     if worst:
         if percentile:
             return (
-                df.drop_duplicates(['route_id'])
-                .loc[df['percentiles'] <= n/100]
+                df.loc[df['percentiles'] <= n/100]
             )
         else:
             return (
-                df.sort_values(by="ratio")
-                .drop_duplicates(['route_id'])
-                .head(n)
+                df.sort_values(by="ratio").head(n)
             )
     else:
         if percentile:
             return (
-                df.drop_duplicates(['route_id'])
-                .loc[df['percentiles'] >= (100-n)/100]
+                df.loc[df['percentiles'] >= (100-n)/100]
             )
         else:
             return (
-                df.sort_values(by="ratio", ascending=False)
-                .drop_duplicates(['route_id']).head(n)
+                df.sort_values(by="ratio", ascending=False).head(n)
             )
 
 
@@ -147,7 +142,7 @@ def boxplot(
         plt.xlabel(xlabel)
     if ylabel is not None:
         plt.ylabel(ylabel)
-    fig.set_xticklabels(['holiday', 'weekday', 'sat', 'sun'])
+    fig.set_xticklabels(xtickslabels)
 
     if show:
         plt.show()
@@ -165,18 +160,17 @@ def boxplot(
 def plot_map(
     geo_df: gpd.GeoDataFrame,
     save_name: str,
-    kwargs: dict,
-        save: bool = True) -> folium.Map:
+    save: bool = True,
+        **kwargs: dict) -> folium.Map:
     """ Create a map of bus routes from GeoDataFrame
 
     Args:
         geo_df (gpd.GeoDataFrame): DataFrame with bus routes, GPS coordinates,
            and some variable of interest e.g. ratio
         save_name (str): The name of the saved output map.
-        kwargs (dict): A dictionary of keyword arguments passed
-            to GeoDataFrame.explore
         save (bool, optional): Whether to save the map. Defaults to True.
-
+        **kwargs (dict): A dictionary of keyword arguments passed
+            to GeoDataFrame.explore
     Returns:
         folium.Map: A map of bus routes colored by a target variable.
     """
@@ -321,7 +315,7 @@ def main() -> None:
     worst_geo = n_worst_best_routes(summary_gdf_geo)
     worst_geo.to_file(
         str(DATA_PATH / 'worst_routes_2022-05-20'
-            '_to_2022-07-20.geojson'), driver="GeoJSON"
+            '_to_2022-07-20.json'), driver="GeoJSON"
     )
     summary_kwargs['legend_kwds'] = {
         "caption": "Ratio of Actual Trips to Scheduled Trips"
@@ -338,7 +332,7 @@ def main() -> None:
     best_geo = n_worst_best_routes(summary_gdf_geo, worst=False)
     best_geo.to_file(
         str(DATA_PATH / 'best_routes_2022-05-20'
-            '_to_2022-07-20.geojson'), driver="GeoJSON"
+            '_to_2022-07-20.json'), driver="GeoJSON"
     )
 
     summary_kwargs['legend_kwds'] = {
@@ -353,7 +347,7 @@ def main() -> None:
 
     summary_gdf_geo.to_file(
         str(DATA_PATH / 'all_routes_2022-05-20'
-            '_to_2022-07-20.geojson'), driver='GeoJSON'
+            '_to_2022-07-20.json'), driver='GeoJSON'
     )
 
 

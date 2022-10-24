@@ -11,8 +11,11 @@ import pendulum
 from tqdm import tqdm
 from dotenv import load_dotenv
 
-import static_gtfs_analysis
-
+import data_analysis.static_gtfs_analysis as static_gtfs_analysis
+from scrape_data.scrape_schedule_versions import (
+    create_schedule_list,
+    check_latest_rt_data_date
+)
 
 load_dotenv()
 
@@ -170,7 +173,7 @@ def combine_real_time_rt_comparison(
     schedule_feeds: List[dict],
     schedule_data_list: List[dict],
     agg_info: AggInfo,
-    my_range: List[str] = ["2022-05-31", "2022-07-04"],
+    my_range: List[str],
         save: bool = True) -> pd.DataFrame:
     """Generate a combined DataFrame with the realtime route comparisons
 
@@ -182,8 +185,8 @@ def combine_real_time_rt_comparison(
             the daily route summary for that version.
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        my_range (List[str], optional): A custom date range for trips.
-            Defaults to ['2022-05-31', '2022-07-04'].
+        my_range (List[str]): A custom date range for trips.
+            Dates are expected in YYYY-MM-DD format.
         save (bool, optional): whether to save the csv file to s3 bucket.
 
     Returns:
@@ -218,7 +221,7 @@ def combine_real_time_rt_comparison(
         for day in date_pbar:
             date_str = day.to_date_string()
             pbar.set_description(
-                f"Processing {date_str} at"
+                f" Processing {date_str} at "
                 f"{pendulum.now().to_datetime_string()}"
             )
 
@@ -259,7 +262,7 @@ def combine_real_time_rt_comparison(
                 outpath,
                 index=False,
             )
-        logger.info(f"Processing {feed['schedule_version']}")
+        logger.info(f" Processing version {feed['schedule_version']}")
         combined = pd.concat([combined, compare_by_day_type])
 
     return combined
@@ -267,14 +270,15 @@ def combine_real_time_rt_comparison(
 
 def build_summary(
     combined_df: pd.DataFrame,
-    date_range: List[str] = ["2022-05-20", "2022-07-20"],
+    date_range: List[str],
         save: bool = True) -> pd.DataFrame:
     """Create a summary by route and day type
 
     Args:
         combined_df (pd.DataFrame): A DataFrame with all schedule versions
-        date_range (List[str], optional): The range for the combined realtime
-            schedule and route comparison data.
+        date_range (List[str]): The range for the combined realtime
+            schedule and route comparison data. Dates are expected in
+            YYYY-MM-DD format.
         save (bool, optional): whether to save DataFrame to s3.
             Defaults to True.
 
@@ -314,33 +318,7 @@ def main(freq: str = 'D') -> pd.DataFrame:
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
-    schedule_feeds = [
-        {
-            "schedule_version": "20220507",
-            "feed_start_date": "2022-05-20",
-            "feed_end_date": "2022-06-02",
-        },
-        {
-            "schedule_version": "20220603",
-            "feed_start_date": "2022-06-04",
-            "feed_end_date": "2022-06-07",
-        },
-        {
-            "schedule_version": "20220608",
-            "feed_start_date": "2022-06-09",
-            "feed_end_date": "2022-07-08",
-        },
-        {
-            "schedule_version": "20220709",
-            "feed_start_date": "2022-07-10",
-            "feed_end_date": "2022-07-17",
-        },
-        {
-            "schedule_version": "20220718",
-            "feed_start_date": "2022-07-19",
-            "feed_end_date": "2022-07-20",
-        },
-    ]
+    schedule_feeds = create_schedule_list(month=5, year=2022)
 
     schedule_data_list = []
     pbar = tqdm(schedule_feeds)
@@ -350,19 +328,19 @@ def main(freq: str = 'D') -> pd.DataFrame:
             f"Generating daily schedule data for "
             f"schedule version {schedule_version}"
         )
-        logging.info(
+        logger.info(
             f"\nDownloading zip file for schedule version "
             f"{schedule_version}"
         )
         CTA_GTFS = static_gtfs_analysis.download_zip(schedule_version)
-        logging.info("\nExtracting data")
+        logger.info("\nExtracting data")
         data = static_gtfs_analysis.GTFSFeed.extract_data(
             CTA_GTFS,
             version_id=schedule_version
         )
         data = static_gtfs_analysis.format_dates_hours(data)
 
-        logging.info("\nSummarizing trip data")
+        logger.info("\nSummarizing trip data")
         trip_summary = static_gtfs_analysis.make_trip_summary(data)
 
         route_daily_summary = (
@@ -374,14 +352,15 @@ def main(freq: str = 'D') -> pd.DataFrame:
             {"schedule_version": schedule_version,
              "data": route_daily_summary}
         )
-
+    date_range = ['2022-05-20', check_latest_rt_data_date()]
     agg_info = AggInfo(freq=freq)
     combined_df = combine_real_time_rt_comparison(
         schedule_feeds,
         schedule_data_list=schedule_data_list,
         agg_info=agg_info,
+        my_range=date_range,
         save=False)
-    return build_summary(combined_df, save=False)
+    return build_summary(combined_df, date_range=date_range, save=False)
 
 
 if __name__ == "__main__":

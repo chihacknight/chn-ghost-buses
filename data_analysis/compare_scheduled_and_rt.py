@@ -18,7 +18,7 @@ load_dotenv()
 
 BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
 logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 BASE_PATH = S3Path(f"/{BUCKET_PUBLIC}")
 
@@ -58,7 +58,7 @@ def make_daily_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     df = (
-        df.groupby(["data_date", "rt", "des"])
+        df.groupby(["data_date", "rt"])
         .agg({"vid": set, "tatripid": set, "tablockid": set})
         .reset_index()
     )
@@ -248,6 +248,8 @@ def combine_real_time_rt_comparison(
             my_range=my_range
         )
 
+        compare_by_day_type['feed_version'] = feed['schedule_version']
+
         if save:
             outpath = (
                 (SCHEDULE_RT_PATH /
@@ -314,32 +316,51 @@ def main(freq: str = 'D') -> pd.DataFrame:
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
-    schedule_feeds = [
-        {
-            "schedule_version": "20220507",
-            "feed_start_date": "2022-05-20",
-            "feed_end_date": "2022-06-02",
-        },
-        {
-            "schedule_version": "20220603",
-            "feed_start_date": "2022-06-04",
-            "feed_end_date": "2022-06-07",
-        },
-        {
-            "schedule_version": "20220608",
-            "feed_start_date": "2022-06-09",
-            "feed_end_date": "2022-07-08",
-        },
-        {
-            "schedule_version": "20220709",
-            "feed_start_date": "2022-07-10",
-            "feed_end_date": "2022-07-17",
-        },
-        {
-            "schedule_version": "20220718",
-            "feed_start_date": "2022-07-19",
-            "feed_end_date": "2022-07-20",
-        },
+    schedule_feeds =  [{'schedule_version': '20220507',
+        'feed_start_date': '2022-05-20',
+        'feed_end_date': '2022-06-02'},
+        {'schedule_version': '20220603',
+        'feed_start_date': '2022-06-04',
+        'feed_end_date': '2022-06-07'},
+        {'schedule_version': '20220608',
+        'feed_start_date': '2022-06-09',
+        'feed_end_date': '2022-07-08'},
+        {'schedule_version': '20220709',
+        'feed_start_date': '2022-07-10',
+        'feed_end_date': '2022-07-17'},
+        {'schedule_version': '20220718',
+        'feed_start_date': '2022-07-19',
+        'feed_end_date': '2022-07-29'},
+        {'schedule_version': '20220730',
+        'feed_start_date': '2022-07-31',
+        'feed_end_date': '2022-08-10'},
+        {'schedule_version': '20220811',
+        'feed_start_date': '2022-08-12',
+        'feed_end_date': '2022-08-12'},
+        {'schedule_version': '20220813',
+        'feed_start_date': '2022-08-14',
+        'feed_end_date': '2022-08-16'},
+        {'schedule_version': '20220817',
+        'feed_start_date': '2022-08-18',
+        'feed_end_date': '2022-09-07'},
+        {'schedule_version': '20220908',
+        'feed_start_date': '2022-09-09',
+        'feed_end_date': '2022-09-17'},
+        {'schedule_version': '20220918',
+        'feed_start_date': '2022-09-19',
+        'feed_end_date': '2022-09-28'},
+        {'schedule_version': '20220929',
+        'feed_start_date': '2022-09-30',
+        'feed_end_date': '2022-10-06'},
+        {'schedule_version': '20221007',
+        'feed_start_date': '2022-10-08',
+        'feed_end_date': '2022-10-11'},
+        {'schedule_version': '20221012',
+        'feed_start_date': '2022-10-13',
+        'feed_end_date': '2022-10-19'},
+        {'schedule_version': '20221020',
+        'feed_start_date': '2022-10-21',
+        'feed_end_date': '2022-10-21'}
     ]
 
     schedule_data_list = []
@@ -363,7 +384,9 @@ def main(freq: str = 'D') -> pd.DataFrame:
         data = static_gtfs_analysis.format_dates_hours(data)
 
         logging.info("\nSummarizing trip data")
-        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+        trip_summary = static_gtfs_analysis.make_trip_summary(data, 
+            pendulum.from_format(feed['feed_start_date'], 'YYYY-MM-DD'), 
+            pendulum.from_format(feed['feed_end_date'], 'YYYY-MM-DD'))
 
         route_daily_summary = (
             static_gtfs_analysis
@@ -381,7 +404,7 @@ def main(freq: str = 'D') -> pd.DataFrame:
         schedule_data_list=schedule_data_list,
         agg_info=agg_info,
         save=False)
-    return build_summary(combined_df, save=False)
+    return schedule_data_list, combined_df, build_summary(combined_df, save=False)
 
 
 if __name__ == "__main__":

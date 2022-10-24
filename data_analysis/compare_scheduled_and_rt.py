@@ -96,7 +96,7 @@ def sum_trips_by_rt_by_freq(
     rt_df: pd.DataFrame,
     sched_df: pd.DataFrame,
     agg_info: AggInfo,
-        my_range: List[str] = ["2022-05-31", "2022-07-04"]) -> pd.DataFrame:
+    holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]) -> pd.DataFrame:
     """Calculate ratio of trips to scheduled trips per route
        per specified frequency.
 
@@ -105,8 +105,8 @@ def sum_trips_by_rt_by_freq(
         sched_df (pd.DataFrame): A DataFrame of daily scheduled route data
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        my_range (List[str], optional): The date range of schedule data.
-            Defaults to ["2022-05-31", "2022-07-04"].
+        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+            Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
 
     Returns:
         pd.DataFrame: DataFrame with the total number of trips per route
@@ -146,7 +146,7 @@ def sum_trips_by_rt_by_freq(
     )
     compare_freq_by_rte.loc[
         compare_freq_by_rte.date.isin(
-            [my_range[0], my_range[1]]), "day_type"
+            holidays), "day_type"
     ] = "hol"
 
     compare_by_day_type = (
@@ -170,8 +170,8 @@ def combine_real_time_rt_comparison(
     schedule_feeds: List[dict],
     schedule_data_list: List[dict],
     agg_info: AggInfo,
-    my_range: List[str] = ["2022-05-31", "2022-07-04"],
-        save: bool = True) -> pd.DataFrame:
+    holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
+    save: bool = True) -> pd.DataFrame:
     """Generate a combined DataFrame with the realtime route comparisons
 
     Args:
@@ -182,8 +182,8 @@ def combine_real_time_rt_comparison(
             the daily route summary for that version.
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        my_range (List[str], optional): A custom date range for trips.
-            Defaults to ['2022-05-31', '2022-07-04'].
+        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+            Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
         save (bool, optional): whether to save the csv file to s3 bucket.
 
     Returns:
@@ -245,7 +245,7 @@ def combine_real_time_rt_comparison(
             rt_df=rt,
             sched_df=schedule,
             agg_info=agg_info,
-            my_range=my_range
+            holidays=holidays
         )
 
         compare_by_day_type['feed_version'] = feed['schedule_version']

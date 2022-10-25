@@ -12,16 +12,17 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
-from scrape_data.scrape_schedule_versions import (
-    create_schedule_list,
-    check_latest_rt_data_date
-)
+from scrape_data.scrape_schedule_versions import create_schedule_list
 
 load_dotenv()
 
 BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
 logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p'
+)
 
 BASE_PATH = S3Path(f"/{BUCKET_PUBLIC}")
 
@@ -99,7 +100,7 @@ def sum_trips_by_rt_by_freq(
     rt_df: pd.DataFrame,
     sched_df: pd.DataFrame,
     agg_info: AggInfo,
-    holidays: List[str] = ["2022-05-30", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        holidays: List[str] = ["2022-05-30", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Calculate ratio of trips to scheduled trips per route
        per specified frequency.
 
@@ -175,7 +176,7 @@ def combine_real_time_rt_comparison(
     schedule_data_list: List[dict],
     agg_info: AggInfo,
     holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
-    save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Generate a combined DataFrame with the realtime route comparisons
 
     Args:
@@ -278,7 +279,7 @@ def combine_real_time_rt_comparison(
 
 def build_summary(
     combined_df: pd.DataFrame,
-    save: bool = True) -> pd.DataFrame:
+        save: bool = True) -> pd.DataFrame:
     """Create a summary by route and day type
 
     Args:
@@ -320,8 +321,8 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
     Args:
         freq (str): Frequency of aggregation. Defaults to Daily.
     Returns:
-        pd.DataFrame: A DataFrame of every day in the specified data with scheduled and
-            observed count of trips. 
+        pd.DataFrame: A DataFrame of every day in the specified data with
+        scheduled and observed count of trips.
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
@@ -361,13 +362,11 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
             {"schedule_version": schedule_version,
              "data": route_daily_summary}
         )
-    date_range = ['2022-05-20', check_latest_rt_data_date()]
     agg_info = AggInfo(freq=freq)
     combined_long, combined_grouped = combine_real_time_rt_comparison(
         schedule_feeds,
         schedule_data_list=schedule_data_list,
         agg_info=agg_info,
-        my_range=date_range,
         save=False)
     return combined_long, build_summary(combined_grouped, save=False)
 

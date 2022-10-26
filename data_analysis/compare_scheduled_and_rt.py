@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 import logging
 
 # required for pandas to read csv from aws
@@ -18,7 +18,7 @@ load_dotenv()
 
 BUCKET_PUBLIC = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
 logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 BASE_PATH = S3Path(f"/{BUCKET_PUBLIC}")
 
@@ -58,7 +58,7 @@ def make_daily_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
     df = (
-        df.groupby(["data_date", "rt", "des"])
+        df.groupby(["data_date", "rt"])
         .agg({"vid": set, "tatripid": set, "tablockid": set})
         .reset_index()
     )
@@ -96,7 +96,7 @@ def sum_trips_by_rt_by_freq(
     rt_df: pd.DataFrame,
     sched_df: pd.DataFrame,
     agg_info: AggInfo,
-        my_range: List[str] = ["2022-05-31", "2022-07-04"]) -> pd.DataFrame:
+    holidays: List[str] = ["2022-05-30", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Calculate ratio of trips to scheduled trips per route
        per specified frequency.
 
@@ -105,10 +105,11 @@ def sum_trips_by_rt_by_freq(
         sched_df (pd.DataFrame): A DataFrame of daily scheduled route data
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        my_range (List[str], optional): The date range of schedule data.
-            Defaults to ["2022-05-31", "2022-07-04"].
+        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+            Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
 
     Returns:
+        pd.DataFrame: DataFrame a row per day per route with the number of scheduled and observed trips. 
         pd.DataFrame: DataFrame with the total number of trips per route
             by specified frequency and the ratio of actual trips to
             scheduled trips.
@@ -146,7 +147,7 @@ def sum_trips_by_rt_by_freq(
     )
     compare_freq_by_rte.loc[
         compare_freq_by_rte.date.isin(
-            [my_range[0], my_range[1]]), "day_type"
+            holidays), "day_type"
     ] = "hol"
 
     compare_by_day_type = (
@@ -162,7 +163,7 @@ def sum_trips_by_rt_by_freq(
         / compare_by_day_type["trip_count_sched"]
     )
 
-    return compare_by_day_type
+    return compare_freq_by_rte, compare_by_day_type
 
 
 # Read in pre-computed files of RT and scheduled data and compare!
@@ -170,8 +171,8 @@ def combine_real_time_rt_comparison(
     schedule_feeds: List[dict],
     schedule_data_list: List[dict],
     agg_info: AggInfo,
-    my_range: List[str] = ["2022-05-31", "2022-07-04"],
-        save: bool = True) -> pd.DataFrame:
+    holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
+    save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Generate a combined DataFrame with the realtime route comparisons
 
     Args:
@@ -182,15 +183,18 @@ def combine_real_time_rt_comparison(
             the daily route summary for that version.
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        my_range (List[str], optional): A custom date range for trips.
-            Defaults to ['2022-05-31', '2022-07-04'].
+        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+            Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
         save (bool, optional): whether to save the csv file to s3 bucket.
 
     Returns:
         pd.DataFrame: Combined DataFrame of various schedule versions
+            with daily counts of observed and scheduled trip count by route.
+        pd.DataFrame: Combined DataFrame of various schedule versions
             with totals per route by a specified frequency.
     """
-    combined = pd.DataFrame()
+    combined_grouped = pd.DataFrame()
+    combined_long = pd.DataFrame()
     pbar = tqdm(schedule_feeds)
     for feed in pbar:
         start_date = feed["feed_start_date"]
@@ -241,12 +245,15 @@ def combine_real_time_rt_comparison(
         rt["route_id"] = rt["rt"]
         schedule["date"] = pd.to_datetime(schedule.date, format="%Y-%m-%d")
 
-        compare_by_day_type = sum_trips_by_rt_by_freq(
+        compare_freq_by_rte, compare_by_day_type = sum_trips_by_rt_by_freq(
             rt_df=rt,
             sched_df=schedule,
             agg_info=agg_info,
-            my_range=my_range
+            holidays=holidays
         )
+
+        compare_by_day_type['feed_version'] = feed['schedule_version']
+        compare_freq_by_rte['feed_version'] = feed['schedule_version']
 
         if save:
             outpath = (
@@ -260,21 +267,19 @@ def combine_real_time_rt_comparison(
                 index=False,
             )
         logger.info(f"Processing {feed['schedule_version']}")
-        combined = pd.concat([combined, compare_by_day_type])
+        combined_grouped = pd.concat([combined_grouped, compare_by_day_type])
+        combined_long = pd.concat([combined_long, compare_freq_by_rte])
 
-    return combined
+    return combined_long, combined_grouped
 
 
 def build_summary(
     combined_df: pd.DataFrame,
-    date_range: List[str] = ["2022-05-20", "2022-07-20"],
-        save: bool = True) -> pd.DataFrame:
+    save: bool = True) -> pd.DataFrame:
     """Create a summary by route and day type
 
     Args:
         combined_df (pd.DataFrame): A DataFrame with all schedule versions
-        date_range (List[str], optional): The range for the combined realtime
-            schedule and route comparison data.
         save (bool, optional): whether to save DataFrame to s3.
             Defaults to True.
 
@@ -292,11 +297,12 @@ def build_summary(
     )
 
     summary["ratio"] = summary["trip_count_rt"] / summary["trip_count_sched"]
+
     if save:
         outpath = (
             (SCHEDULE_RT_PATH /
              f"combined_schedule_realtime_rt_level_comparison_"
-             f"{date_range[0]}_to_{date_range[1]}.csv").as_uri()
+             f"{pendulum.now()}.csv").as_uri()
         )
         summary.to_csv(
             outpath,
@@ -305,41 +311,63 @@ def build_summary(
     return summary
 
 
-def main(freq: str = 'D') -> pd.DataFrame:
+def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
     """Calculate the summary by route and day across multiple schedule versions
 
     Args:
         freq (str): Frequency of aggregation. Defaults to Daily.
     Returns:
+        pd.DataFrame: A DataFrame of every day in the specified data with scheduled and
+            observed count of trips. 
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
-    schedule_feeds = [
-        {
-            "schedule_version": "20220507",
-            "feed_start_date": "2022-05-20",
-            "feed_end_date": "2022-06-02",
-        },
-        {
-            "schedule_version": "20220603",
-            "feed_start_date": "2022-06-04",
-            "feed_end_date": "2022-06-07",
-        },
-        {
-            "schedule_version": "20220608",
-            "feed_start_date": "2022-06-09",
-            "feed_end_date": "2022-07-08",
-        },
-        {
-            "schedule_version": "20220709",
-            "feed_start_date": "2022-07-10",
-            "feed_end_date": "2022-07-17",
-        },
-        {
-            "schedule_version": "20220718",
-            "feed_start_date": "2022-07-19",
-            "feed_end_date": "2022-07-20",
-        },
+
+    schedule_feeds =  [{'schedule_version': '20220507',
+        'feed_start_date': '2022-05-20',
+        'feed_end_date': '2022-06-02'},
+        {'schedule_version': '20220603',
+        'feed_start_date': '2022-06-04',
+        'feed_end_date': '2022-06-07'},
+        {'schedule_version': '20220608',
+        'feed_start_date': '2022-06-09',
+        'feed_end_date': '2022-07-08'},
+        {'schedule_version': '20220709',
+        'feed_start_date': '2022-07-10',
+        'feed_end_date': '2022-07-17'},
+        {'schedule_version': '20220718',
+        'feed_start_date': '2022-07-19',
+        'feed_end_date': '2022-07-29'},
+        {'schedule_version': '20220730',
+        'feed_start_date': '2022-07-31',
+        'feed_end_date': '2022-08-10'},
+        {'schedule_version': '20220811',
+        'feed_start_date': '2022-08-12',
+        'feed_end_date': '2022-08-12'},
+        {'schedule_version': '20220813',
+        'feed_start_date': '2022-08-14',
+        'feed_end_date': '2022-08-16'},
+        {'schedule_version': '20220817',
+        'feed_start_date': '2022-08-18',
+        'feed_end_date': '2022-09-07'},
+        {'schedule_version': '20220908',
+        'feed_start_date': '2022-09-09',
+        'feed_end_date': '2022-09-17'},
+        {'schedule_version': '20220918',
+        'feed_start_date': '2022-09-19',
+        'feed_end_date': '2022-09-28'},
+        {'schedule_version': '20220929',
+        'feed_start_date': '2022-09-30',
+        'feed_end_date': '2022-10-06'},
+        {'schedule_version': '20221007',
+        'feed_start_date': '2022-10-08',
+        'feed_end_date': '2022-10-11'},
+        {'schedule_version': '20221012',
+        'feed_start_date': '2022-10-13',
+        'feed_end_date': '2022-10-19'},
+        {'schedule_version': '20221020',
+        'feed_start_date': '2022-10-21',
+        'feed_end_date': '2022-10-21'}
     ]
 
     schedule_data_list = []
@@ -363,7 +391,9 @@ def main(freq: str = 'D') -> pd.DataFrame:
         data = static_gtfs_analysis.format_dates_hours(data)
 
         logging.info("\nSummarizing trip data")
-        trip_summary = static_gtfs_analysis.make_trip_summary(data)
+        trip_summary = static_gtfs_analysis.make_trip_summary(data, 
+            pendulum.from_format(feed['feed_start_date'], 'YYYY-MM-DD'), 
+            pendulum.from_format(feed['feed_end_date'], 'YYYY-MM-DD'))
 
         route_daily_summary = (
             static_gtfs_analysis
@@ -376,12 +406,12 @@ def main(freq: str = 'D') -> pd.DataFrame:
         )
 
     agg_info = AggInfo(freq=freq)
-    combined_df = combine_real_time_rt_comparison(
+    combined_long, combined_grouped = combine_real_time_rt_comparison(
         schedule_feeds,
         schedule_data_list=schedule_data_list,
         agg_info=agg_info,
         save=False)
-    return build_summary(combined_df, save=False)
+    return combined_long, build_summary(combined_grouped, save=False)
 
 
 if __name__ == "__main__":

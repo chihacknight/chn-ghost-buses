@@ -30,7 +30,7 @@ VERSION_ID = "20220718"
 BUCKET = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
 
 logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 
 @dataclass
@@ -132,11 +132,13 @@ def format_dates_hours(data: GTFSFeed) -> GTFSFeed:
     return data
 
 
-def make_trip_summary(data: GTFSFeed) -> pd.DataFrame:
+def make_trip_summary(data: GTFSFeed, feed_start_date: pendulum.datetime, feed_end_date: pendulum.datetime) -> pd.DataFrame:
     """Create a summary of trips with one row per date
 
     Args:
         data (GTFSFeed): GTFS data from CTA
+        feed_start_date (datetime): Date from which this feed is valid (inclusive)
+        feed_end_date (datetime): Date until which this feed is valid (inclusive)
 
     Returns:
         pd.DataFrame: A DataFrame with each trip that occurred per row.
@@ -231,6 +233,9 @@ def make_trip_summary(data: GTFSFeed) -> pd.DataFrame:
     # result has one row per date + row from trips.txt (incl. route) + hour
     trip_summary = trips_happened.merge(
         trip_stop_hours, how="left", on="trip_id")
+    
+    # filter to only the rows for the period where this specific feed version was in effect
+    trip_summary = trip_summary.loc[(trip_summary['raw_date'] >= feed_start_date) & (trip_summary['raw_date'] <= feed_end_date),:]
 
     return trip_summary
 
@@ -253,7 +258,7 @@ def group_trips(
     summary = (
         trip_summary.groupby(by=groupby_vars)
         ["trip_id"]
-        .count()
+        .nunique()
         .reset_index()
     )
 
@@ -280,7 +285,7 @@ def summarize_date_rt(trip_summary: pd.DataFrame) -> pd.DataFrame:
     trip_summary = trip_summary.copy()
     groupby_vars = ["raw_date", "route_id"]
 
-    # group to get trips by hour by date by route
+    # group to get trips by date by route
     route_daily_summary = group_trips(
         trip_summary,
         groupby_vars=groupby_vars,

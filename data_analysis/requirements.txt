@@ -5,3 +5,7 @@ s3fs==2022.7.1
 shapely==1.8.4
 jupyter==1.0.0
 typer[all]==0.6.1
+plotly==5.11.0
+chart-studio==1.1.0
+statsmodels==0.13.5
+

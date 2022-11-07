@@ -538,28 +538,35 @@ def main(mvp: bool = False) -> None:
     gdf = static_gtfs_analysis.main()
 
     logger.info("Getting latest real-time and schedule comparison data")
-    combined_long_df, summary_df = compare_scheduled_and_rt.main(freq='D')
+
     if mvp:
         # Date range is between 2022-05-20 and 2022-11-05
-        logger.info("Filtering data between 2022-05-20 and 2022-11-05 for MVP")
-        combined_long_df = combined_long_df.loc[
-            (combined_long_df['date'] >= "2022-05-20")
-            & (combined_long_df['date'] <= "2022-11-05")
-        ]
+        logger.info(
+            "Loading data for MVP."
+            " Date range is between 2022-05-20 and 2022-11-05"
+        )
+        try:
+            combined_long_df = pd.read_csv(
+                DATA_PATH / 'combined_long_df_2022-11-06.csv'
+            )
+            summary_df = pd.read_csv(DATA_PATH / 'summary_df_2022-11-06.csv')
+        except FileNotFoundError:
+            combined_long_df = pd.read_csv(
+                DATA_PATH.parent / 'combined_long_df_2022-11-06.csv'
+            )
+            summary_df = pd.read_csv(
+                DATA_PATH.parent / 'summary_df_2022-11-06.csv'
+            )
+
         # MVP is weekday only
         logger.info("Keeping only weekday data for MVP")
         summary_df_wk = summary_df.loc[summary_df.day_type == 'wk']
         summary_df_wk = calculate_percentile_and_rank(summary_df_wk)
 
-        logger.info("Saving data")
-        combined_long_path = create_save_path("combined_long_df_mvp", DATA_PATH)
-        combined_long_df.to_csv(f'{combined_long_path}.csv', index=False)
-        summary_df_path = create_save_path("summary_df_mvp", DATA_PATH)
-        summary_df_wk.to_csv(f'{summary_df_path}.csv', index=False)
-
         summary_gdf = summary_df_wk.merge(gdf, how="right", on="route_id")
 
     else:
+        combined_long_df, summary_df = compare_scheduled_and_rt.main(freq='D')
         summary_df = calculate_percentile_and_rank(summary_df)
 
         logger.info("Saving data")
@@ -572,6 +579,7 @@ def main(mvp: bool = False) -> None:
 
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
+    combined_long_df['date'] = pd.to_datetime(combined_long_df['date'])
     start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
     end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
 
@@ -589,6 +597,8 @@ def main(mvp: bool = False) -> None:
     save_name = f"all_routes_{start_date}_to_{end_date}"
     if mvp:
         save_name += "_wk"
+    else:
+        save_name += "_all_day_types"
     _ = plot_map(
             summary_gdf_geo,
             save_name=save_name,
@@ -619,6 +629,8 @@ def main(mvp: bool = False) -> None:
     save_name = f"all_routes_quantiles_{start_date}_to_{end_date}"
     if mvp:
         save_name += "_wk"
+    else:
+        save_name += "_all_day_types"
     _ = plot_map(
             summary_gdf_geo,
             save_name=save_name,
@@ -633,6 +645,8 @@ def main(mvp: bool = False) -> None:
     save_name = f"worst_routes_{start_date}_to_{end_date}"
     if mvp:
         save_name += "_wk"
+    else:
+        save_name += "_all_day_types"
 
     summary_kwargs['legend_kwds'] = {
         "caption": "Ratio of Actual Trips to Scheduled Trips"
@@ -659,6 +673,9 @@ def main(mvp: bool = False) -> None:
     save_name = f"best_routes_{start_date}_to_{end_date}"
     if mvp:
         save_name += "_wk"
+    else:
+        save_name += "_all_day_types"
+
 
     summary_kwargs['legend_kwds'] = {
         "caption": "Ratio of Actual Trips to Scheduled Trips"

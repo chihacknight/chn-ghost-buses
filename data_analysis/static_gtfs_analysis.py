@@ -426,8 +426,11 @@ def main() -> geopandas.GeoDataFrame:
         geopandas.GeoDataFrame: DataFrame with route shapes
     """
     # TODO update so that all schedule versions are used.
-    # Currently uses up too much memory, so the latest schedule
-    # version is used instead.
+    # Combining all schedule versions uses up too much memory, 
+    # so the latest schedule version is taken instead. 
+    # This should not affect the result when used
+    # to generate plots because the GPS coordinates of each route
+    # are the main interest.
 
     schedule_list = create_schedule_list(5, 2022)
     # Get the latest version

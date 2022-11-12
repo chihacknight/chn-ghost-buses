@@ -360,64 +360,6 @@ def download_extract_format(version_id: str) -> GTFSFeed:
     return data
 
 
-def create_GTFSFeeds_list(schedule_list: List[dict]) -> List[GTFSFeed]:
-    """Make a list of GTFS feeds from a list of schedule versions
-
-    Args:
-        schedule_list (List[dict]): A list of schedule versions and their
-            start and end dates
-
-    Returns:
-        List[GTFSFeed]: A list of GTFSFeed objects for the
-            schedule versions in schedule_list
-    """
-    version_list = [value for d in schedule_list for key, value in d.items()
-                    if key == 'schedule_version']
-    CTA_GTFS_list = []
-    for version in version_list:
-        CTA_GTFS_list.append(download_extract_format(version))
-    return CTA_GTFS_list
-
-
-def concat_GTFSFeeds(schedule_list: List[dict]) -> GTFSFeed:
-    """Concatenate the GTFSFeeds list into one GTFSFeed object.
-
-    Args:
-        schedule_list (List[dict]): A list of schedule versions
-            and their start and end dates
-
-    Returns:
-        GTFSFeed: A GTFSFeed object containing all the GTFS objects created
-            from the schedule_list.
-    """
-    GTFSFeeds_list = create_GTFSFeeds_list(schedule_list)
-    # Concatenate stop_times, trips, routes, and shapes
-
-    stops = pd.DataFrame()
-    trips = pd.DataFrame()
-    routes = pd.DataFrame()
-    shapes = pd.DataFrame()
-
-    for data in GTFSFeeds_list:
-        stops = pd.concat([stops, data.stops])
-        trips = pd.concat([trips, data.trips])
-        routes = pd.concat([routes, data.routes])
-        shapes = pd.concat([shapes, data.shapes])
-
-    for df in [stops, trips, routes, shapes]:
-        df.drop_duplicates(inplace=True)
-
-    data = GTFSFeed(
-        stops=stops,
-        trips=trips,
-        routes=routes,
-        shapes=shapes,
-        calendar=None,
-        calendar_dates=None,
-        stop_times=None
-    )
-
-
 def main() -> geopandas.GeoDataFrame:
     """Download data from CTA, construct shapes from shape data,
     and save to geojson file
@@ -425,12 +367,6 @@ def main() -> geopandas.GeoDataFrame:
     Returns:
         geopandas.GeoDataFrame: DataFrame with route shapes
     """
-    # TODO update so that all schedule versions are used.
-    # Combining all schedule versions uses up too much memory, 
-    # so the latest schedule version is taken instead. 
-    # This should not affect the result when used
-    # to generate plots because the GPS coordinates of each route
-    # are the main interest.
 
     schedule_list = create_schedule_list(5, 2022)
     # Get the latest version

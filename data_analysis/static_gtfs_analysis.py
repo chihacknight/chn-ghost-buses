@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from dataclasses import dataclass
+from typing import List
 
 import logging
 import calendar
@@ -25,12 +26,17 @@ import shapely
 import geopandas
 
 from tqdm import tqdm
+from scrape_data.scrape_schedule_versions import create_schedule_list
 
 VERSION_ID = "20220718"
 BUCKET = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
 
 logger = logging.getLogger()
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p'
+)
 
 
 @dataclass
@@ -132,7 +138,10 @@ def format_dates_hours(data: GTFSFeed) -> GTFSFeed:
     return data
 
 
-def make_trip_summary(data: GTFSFeed, feed_start_date: pendulum.datetime, feed_end_date: pendulum.datetime) -> pd.DataFrame:
+def make_trip_summary(
+    data: GTFSFeed,
+    feed_start_date: pendulum.datetime,
+        feed_end_date: pendulum.datetime) -> pd.DataFrame:
     """Create a summary of trips with one row per date
 
     Args:
@@ -233,9 +242,11 @@ def make_trip_summary(data: GTFSFeed, feed_start_date: pendulum.datetime, feed_e
     # result has one row per date + row from trips.txt (incl. route) + hour
     trip_summary = trips_happened.merge(
         trip_stop_hours, how="left", on="trip_id")
-    
+
     # filter to only the rows for the period where this specific feed version was in effect
-    trip_summary = trip_summary.loc[(trip_summary['raw_date'] >= feed_start_date) & (trip_summary['raw_date'] <= feed_end_date),:]
+    trip_summary = trip_summary.loc[
+        (trip_summary['raw_date'] >= feed_start_date)
+        & (trip_summary['raw_date'] <= feed_end_date), :]
 
     return trip_summary
 
@@ -333,23 +344,35 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
     return CTA_GTFS
 
 
-def main(version_id: str = None) -> geopandas.GeoDataFrame:
-    """Download data from CTA, construct shapes from shape data,
-    and save to geojson file
+def download_extract_format(version_id: str) -> GTFSFeed:
+    """Download a zipfile of GTFS data for a given version_id,
+        extract data, and format date column.
 
     Args:
-        version_id (str, optional): The schedule version to use.
-            Defaults to None.
+        version_id (str): The version of the GTFS schedule data to download
+
+    Returns:
+        GTFSFeed: A GTFSFeed object with formated dates
+    """
+    CTA_GTFS = download_zip(version_id)
+    data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
+    data = format_dates_hours(data)
+    return data
+
+
+def main() -> geopandas.GeoDataFrame:
+    """Download data from CTA, construct shapes from shape data,
+    and save to geojson file
 
     Returns:
         geopandas.GeoDataFrame: DataFrame with route shapes
     """
-    if version_id is None:
-        version_id = VERSION_ID
 
-    CTA_GTFS = download_zip(version_id)
-    data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
-    data = format_dates_hours(data)
+    schedule_list = create_schedule_list(5, 2022)
+    # Get the latest version
+    version_id = schedule_list[-1]['schedule_version']
+
+    data = download_extract_format(version_id)
 
     # check that there are no dwell periods that cross hour boundary
     cross_hr_bndary = (
@@ -360,10 +383,6 @@ def main(version_id: str = None) -> geopandas.GeoDataFrame:
         logging.warn(
             f"There are dwell periods that cross "
             f"the hour boundary. See {cross_hr_bndary}")
-
-    trip_summary = make_trip_summary(data)
-
-    summarize_date_rt(trip_summary)
 
     # ## Most common shape by route
 
@@ -426,6 +445,7 @@ def main(version_id: str = None) -> geopandas.GeoDataFrame:
         f.write(final_gdf.loc[(final_gdf["route_type"] == "3")].to_json())
 
     logging.info(f'geojson saved to {save_path}')
+
     return final_gdf
 
 

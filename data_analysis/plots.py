@@ -643,8 +643,16 @@ def plot_and_save(
     )
 
     path_name = create_save_path(save_name, DATA_PATH)
-    summary_gdf_geo.to_file(f'{path_name}.json', driver='GeoJSON')
-    summary_gdf_geo.to_html(f'{path_name}_table.html', index=False)
+    # Take only the columns related to summary_kwargs['column']
+    # and those used in the map
+    first_cols = summary_gdf_geo.columns[:2].tolist()
+    last_cols = summary_gdf_geo.columns[-10:].to_list()
+    kwargs_cols = summary_gdf_geo.columns[
+        summary_gdf_geo.columns.str.startswith(summary_kwargs['column'])
+    ].tolist()
+    cols = first_cols + kwargs_cols + last_cols
+    summary_gdf_geo[cols].to_file(f'{path_name}.json', driver='GeoJSON')
+    summary_gdf_geo[cols].to_html(f'{path_name}_table.html', index=False)
 
 
 def calculate_trips_per_rider(
@@ -731,7 +739,7 @@ def make_all_maps(
         "max_labels": 5
     }
 
-    save_name = f"all_routes_{start_date}_{end_date}_{day_suffix}"
+    save_name = f"all_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,
@@ -745,7 +753,7 @@ def make_all_maps(
         "max_labels": 5
     }
 
-    save_name = f"all_routes_{start_date}_{end_date}_{day_suffix}"
+    save_name = f"all_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,

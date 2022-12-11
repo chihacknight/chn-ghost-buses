@@ -407,12 +407,13 @@ def fetch_ridership_data() -> pd.DataFrame:
             available date.
     """
     logger.info("Fetching ridership data")
+
     ridership_by_rte_date = pd.read_csv(
         "https://data.cityofchicago.org/api/views/"
         "jyb9-n7fm/rows.csv?accessType=DOWNLOAD")
 
-    ridership_by_rte_date['date'] = pd.to_datetime(
-        ridership_by_rte_date['date'],
+    ridership_by_rte_date.loc[:, 'date'] = pd.to_datetime(
+        ridership_by_rte_date.loc[:, 'date'],
         infer_datetime_format=True
     )
     return ridership_by_rte_date
@@ -557,7 +558,7 @@ def groupby_long_df(df: pd.DataFrame,
             vars and a trip ratio column.
     """
     df = df.copy()
-    df['date'] = pd.to_datetime(df['date'])
+    df.loc[:, 'date'] = pd.to_datetime(df.loc[:, 'date'])
 
     df = (
         df.groupby(groupbyvars)[['trip_count_rt', 'trip_count_sched']]
@@ -719,7 +720,7 @@ def make_all_maps(
         "legend": True,
     }
     if (summary_gdf_geo['day_type']
-            .loc[summary_gdf_geo['day_type'].notnull()]).all():
+            .loc[summary_gdf_geo['day_type'].notnull()] == 'wk').all():
         day_suffix = 'wk'
     else:
         day_suffix = 'all_day_types'
@@ -971,7 +972,7 @@ def run_mvp() -> None:
     combined_long_df = pd.read_csv(
         DATA_PATH / 'combined_long_df_2022-11-06.csv'
     )
-    combined_long_df['date'] = pd.to_datetime(combined_long_df['date'])
+    combined_long_df.loc[:, 'date'] = pd.to_datetime(combined_long_df.loc[:, 'date'])
 
     start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
     end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
@@ -1068,7 +1069,9 @@ def main() -> None:
 
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
-    combined_long_df['date'] = pd.to_datetime(combined_long_df['date'])
+    combined_long_df.loc[:, 'date'] = pd.to_datetime(
+        combined_long_df.loc[:, 'date']
+    )
 
     start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
     end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
@@ -1165,15 +1168,19 @@ def make_descriptive_plots(
         combined_long_df (pd.DataFrame): A DataFrame containing actual trips
             and scheduled trips per route per day
         summary_df (pd.DataFrame): A DataFrame of actual trips and scheduled
-            trip per route
+            trips per route
     """
-    combined_long_df['date'] = pd.to_datetime(combined_long_df['date'])
+    combined_long_df = combined_long_df.copy()
+
+    combined_long_df.loc[:, 'date'] = pd.to_datetime(
+        combined_long_df.loc[:, 'date']
+    )
 
     start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
     end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
 
-    combined_long_df["ratio"] = (
-        combined_long_df["trip_count_rt"] / combined_long_df["trip_count_sched"]
+    combined_long_df.loc[:, "ratio"] = (
+        combined_long_df.loc[:, "trip_count_rt"] / combined_long_df.loc[:, "trip_count_sched"]
     )
 
     combined_long_groupby_date = groupby_long_df(

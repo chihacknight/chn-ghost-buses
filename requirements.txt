@@ -12,4 +12,4 @@ folium==0.12.1.post1
 mapclassify==2.4.2+55.g0155c6e
 plotly==5.11.0
 kaleido==0.2.1
-
+pre-commit==2.20.0

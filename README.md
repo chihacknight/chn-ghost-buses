@@ -20,6 +20,6 @@ BUCKET_PRIVATE='chn-ghost-buses-private'
 Note that there may be permissions issues when running `rt_daily_aggregations.py` with `BUCKET_PUBLIC` as the `BUCKET_NAME`.
 
 ## Pre-commit hooks
-Pre-commit hooks are defined in `.pre-commit-config.yaml`. The hooks will enforce style with the linter `black`, check for commited credentials and extraneous debugger breakpoints, and sort imports, among other things.
+Pre-commit hooks are defined in `.pre-commit-config.yaml`, based on this [post](https://towardsdatascience.com/pre-commit-hooks-you-must-know-ff247f5feb7e). The hooks will enforce style with the linter `black`, check for commited credentials and extraneous debugger breakpoints, and sort imports, among other things.
 
 To get the latest versions of dependencies, update the `.pre-commit-config.yaml` file with `pre-commit autoupdate`. To run the hooks against all files without committing, use `pre-commit run --all-files`. To have the pre-commit hooks run when executing `git commit`, use `pre-commit install`.

@@ -695,6 +695,27 @@ def calculate_trips_per_rider(
     return daily_means
 
 
+def filter_day_type(df: pd.DataFrame, day_type: str) -> pd.DataFrame:
+    df = df.copy()
+    day_types = list(DAY_NAMES.keys())
+    if day_type not in day_types:
+        error_text = ", ".join(day_types[:-1]) + ', or ' + day_types[-1]
+        raise ValueError(f"day_type must be one of {error_text}")
+    return df.loc[df['day_type'] == day_type]
+
+
+def set_day_type_suffix(df: pd.DataFrame) -> str:
+    df = df.copy()
+    day_suffix = None
+    for day_type in DAY_NAMES.keys():
+        if (df['day_type']
+                .loc[df['day_type'].notnull()] == day_type).all():
+            day_suffix = day_type
+    if day_suffix is None:
+        day_suffix = 'all_day_types'
+    return day_suffix
+
+
 def make_all_maps(
     summary_gdf_geo: gpd.GeoDataFrame,
     start_date: str,
@@ -719,11 +740,7 @@ def make_all_maps(
         },
         "legend": True,
     }
-    if (summary_gdf_geo['day_type']
-            .loc[summary_gdf_geo['day_type'].notnull()] == 'wk').all():
-        day_suffix = 'wk'
-    else:
-        day_suffix = 'all_day_types'
+    day_suffix = set_day_type_suffix(summary_gdf_geo)
 
     logger.info(f"Using only {day_suffix} data")
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_suffix}"
@@ -981,7 +998,7 @@ def run_mvp() -> None:
 
     # MVP is weekday only
     logger.info("Keeping only weekday data for MVP")
-    summary_df_wk = summary_df.loc[summary_df.day_type == 'wk']
+    summary_df_wk = filter_day_type(summary_df, day_type='wk')
     summary_df_wk = calculate_percentile_and_rank(summary_df_wk, col="ratio")
 
     # Weekday only
@@ -1035,9 +1052,12 @@ def run_mvp() -> None:
     )
 
 
-def main() -> None:
-    """Generate maps of all routes, top 10 best routes,
+def main(day_type: str = None) -> None:
+    """ Generate maps of all routes, top 10 best routes,
     top 10 worst routes, and ridership
+
+    Args:
+        day_type (str, optional): day_type to filter by. Defaults to None.
     """
     logger.info("Creating GeoDataFrame")
     gdf = static_gtfs_analysis.main()
@@ -1045,6 +1065,10 @@ def main() -> None:
     logger.info("Getting latest real-time and schedule comparison data")
 
     combined_long_df, summary_df = compare_scheduled_and_rt.main(freq='D')
+
+    if day_type is not None:
+        summary_df = filter_day_type(summary_df, day_type=day_type)
+
     summary_df = calculate_percentile_and_rank(summary_df, col="ratio")
 
     route_daily_mean = (

@@ -696,6 +696,19 @@ def calculate_trips_per_rider(
 
 
 def filter_day_type(df: pd.DataFrame, day_type: str) -> pd.DataFrame:
+    """Filter DataFrame by type of day
+
+    Args:
+        df (pd.DataFrame): DataFrame containing a day_type column
+        day_type (str): The type of day
+
+    Raises:
+        ValueError: An error is raised if day_type is not one of
+            'wk', 'sat', 'sun', or 'hol'
+
+    Returns:
+        pd.DataFrame: A DataFrame containing only rows with day_type
+    """
     df = df.copy()
     day_types = list(DAY_NAMES.keys())
     if day_type not in day_types:
@@ -705,6 +718,16 @@ def filter_day_type(df: pd.DataFrame, day_type: str) -> pd.DataFrame:
 
 
 def set_day_type_suffix(df: pd.DataFrame) -> str:
+    """Set the day_type to be included in the filename of the 
+       saved output
+
+    Args:
+        df (pd.DataFrame): DataFrame containing a day_type column
+
+    Returns:
+        str: The day type found in the day_type column. Returns the string
+            all_day_types when there is a mix of day types
+    """
     df = df.copy()
     day_suffix = None
     for day_type in DAY_NAMES.keys():

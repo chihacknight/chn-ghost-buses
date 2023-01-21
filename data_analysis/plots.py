@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import weightedstats
 from branca.colormap import LinearColormap
 from statsmodels.tsa.stattools import adfuller, kpss
 
@@ -962,6 +963,8 @@ def run_mvp() -> None:
         combined_long_df=combined_long_df_wk, summary_df=summary_df_wk_mean
     )
 
+    make_ward_maps(summary_df_wk, start_date, end_date)
+
 
 def main(day_type: str = None) -> None:
     """Generate maps of all routes, top 10 best routes,
@@ -1042,6 +1045,8 @@ def main(day_type: str = None) -> None:
     create_ridership_map()
 
     make_descriptive_plots(combined_long_df=combined_long_df, summary_df=summary_df)
+
+    make_ward_maps(summary_df, start_date, end_date)
 
 
 def merge_ridership_combined(
@@ -1213,3 +1218,185 @@ def make_descriptive_plots(
         f"{start_date}_to_{ridership_end_date}"
         f"_all_day_types",
     )
+
+
+def calculate_ratio_per_ward(
+    ward_df: pd.DataFrame, summary_df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Args:
+        ward_df (pd.DataFrame): DataFrame containing all routes
+            passing through a ward
+        summary_df (pd.DataFrame): DataFrame containing trip ratio per route
+
+    Returns:
+        pd.DataFrame: DataFrame containing median and weighted median
+            trip ratio of all routes per ward
+    """
+    # Deal with list values in 'routes' column
+    df_explode = ward_df.explode("routes").reset_index(drop=True)
+    df_explode = df_explode.drop(columns=["trip_count_rt", "trip_count_sched", "ratio"])
+    merged_df = summary_df.merge(df_explode, left_on="route_id", right_on="routes")
+    freq_df = (
+        merged_df["route_id"]
+        .value_counts()
+        .reset_index()
+        .rename(columns={"index": "route_id", "route_id": "count"})
+    )
+    merged_df = merged_df.merge(freq_df, on="route_id")
+    merged_df["weights"] = 1 / merged_df["count"]
+    medians = merged_df.groupby("ward").agg(median=("ratio", "median"))
+    weighted_medians = merged_df.groupby("ward").apply(
+        weighted_median, "ratio", "weights"
+    )
+
+    medians = medians.reset_index()
+    weighted_medians = weighted_medians.reset_index().rename(
+        columns={0: "weighted_median"}
+    )
+    medians_merge_df = medians.merge(weighted_medians, on="ward")
+    return medians_merge_df
+
+
+def weighted_median(df: pd.DataFrame, col: str, weights: List[float]) -> float:
+    """Compute the weighted median
+
+    Args:
+        df (pd.DataFrame): The DataFrame to apply the weighted median function to
+        col (str): The column to compute the weighted median on
+        weights (List[float]): Weights for the specified column
+
+    Returns:
+        List[float]: the weighted median of col according to weights
+    """
+    return weightedstats.weighted_median(df[col], df[weights])
+
+
+def create_ward_map(
+    ward_df: pd.DataFrame, start_date: str, end_date: str, day_type_suffix: str
+) -> None:
+    """Create a map of wards colored by median trip ratio of routes passing
+        through a ward
+
+    Args:
+        ward_df (pd.DataFrame): A DataFrame containing routes
+            passing through a ward
+        start_date (str): The start of the data series
+        end_date (str): The end of the data series
+        day_type_suffix (str): The type of day of the data.
+            Will be one of wk, hol, sat, or sun
+    """
+    ward_boundaries_df = gpd.read_file(DATA_PATH / "chicagoWards2023.geojson")
+    ward_boundaries_df["ward"] = ward_boundaries_df["ward"].astype(int)
+    ward_boundaries_df["edit_date"] = ward_boundaries_df["edit_date"].astype(str)
+    merged_ward_boundaries = ward_df.merge(ward_boundaries_df, on="ward")
+    summary_kwargs = {
+        "cmap": "plasma",
+        "column": "median",
+        "legend_kwds": {
+            "caption": "Median ratio of Actual Trips to Scheduled Trips",
+            "max_labels": 5,
+        },
+        "legend": True,
+    }
+
+    merged_ward_boundaries_gdf = gpd.GeoDataFrame(merged_ward_boundaries)
+    logger.info(f"Making ward map of {summary_kwargs['column']} trip ratios")
+    ward_map = merged_ward_boundaries_gdf.explore(**summary_kwargs)
+    save_path = create_save_path(
+        f"ward_map_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs['column']}"
+    )
+    ward_map.save(f"{save_path}.html")
+
+    summary_kwargs["column"] = "weighted_median"
+    summary_kwargs["legend_kwds"] = {
+        "caption": "Weighted median of Ratio of Actual Trips to Scheduled Trips",
+        "max_labels": 5,
+    }
+
+    logger.info(f"Making ward map of {summary_kwargs['column']} trip ratios")
+    ward_map_weighted = merged_ward_boundaries_gdf.explore(**summary_kwargs)
+    save_path = create_save_path(
+        f"ward_map_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs['column']}"
+    )
+    ward_map_weighted.save(f"{save_path}.html")
+
+    # Quantile maps
+    bounds = legend_formatter(merged_ward_boundaries_gdf, "median", decimals="2f")
+
+    summary_kwargs_quantiles = {
+        "cmap": "plasma",
+        "column": "median",
+        "scheme": "Quantiles",
+        "legend_kwds": {
+            "caption": "Median of Ratio of Actual Trips to Scheduled Trips",
+            "colorbar": False,
+            "labels": bounds,
+        },
+        "legend": True,
+        "categorical": False,
+        "k": 5,
+    }
+
+    logger.info(
+        f"Making quantile ward map of {summary_kwargs_quantiles['column']} trip ratios"
+    )
+    ward_map_quantiles = merged_ward_boundaries_gdf.explore(**summary_kwargs_quantiles)
+    save_path = create_save_path(
+        f"ward_map_quantiles_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs_quantiles['column']}"
+    )
+    ward_map_quantiles.save(f"{save_path}.html")
+
+    bounds_weighted = legend_formatter(
+        merged_ward_boundaries_gdf, var="weighted_median", decimals="2f"
+    )
+
+    summary_kwargs_quantiles["column"] = "weighted_median"
+    summary_kwargs_quantiles["legend_kwds"] = {
+        "caption": "Weighted Median of Ratio of Actual Trips to Scheduled Trips",
+        "colorbar": False,
+        "labels": bounds_weighted,
+    }
+
+    logger.info(
+        f"Making quantile ward map of {summary_kwargs_quantiles['column']} trip ratios"
+    )
+    ward_map_quantiles_weighted = merged_ward_boundaries_gdf.explore(
+        **summary_kwargs_quantiles
+    )
+    save_path = create_save_path(
+        f"ward_map_quantiles_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs_quantiles['column']}"
+    )
+    ward_map_quantiles_weighted.save(f"{save_path}.html")
+
+    logger.info("saving JSON and HTML table")
+    path_name = create_save_path(
+        f"ward_rankings_{start_date}_to_{end_date}_{day_type_suffix}", DATA_PATH
+    )
+
+    # Convert list to string in GeoDataFrame before saving
+    merged_ward_boundaries_gdf["routes"] = merged_ward_boundaries_gdf["routes"].apply(
+        lambda x: " ".join(x)
+    )
+    merged_ward_boundaries_gdf.to_file(f"{path_name}.json", driver="GeoJSON")
+    merged_ward_boundaries_gdf.to_html(f"{path_name}_table.html", index=False)
+
+
+def make_ward_maps(summary_df: pd.DataFrame, start_date: str, end_date: str) -> None:
+    """Prepare data for ward maps and plot them
+
+    Args:
+        summary_df (pd.DataFrame): DataFrame containing trip ratio for each route
+        start_date (str): The start of the data series
+        end_date (str): The end of the date series
+    """
+    ward_df = pd.read_json(DATA_PATH / "wardBusRouteMappings.json")
+    medians_ward_df = calculate_ratio_per_ward(ward_df, summary_df)
+    day_type_suffix = set_day_type_suffix(summary_df)
+    # Keep the entire list of routes per ward
+    medians_ward_df = medians_ward_df.merge(ward_df[["ward", "routes"]], on="ward")
+    median_ward_df_rank = calculate_percentile_and_rank(medians_ward_df, "median")
+    weighted_median_ward_df_rank = calculate_percentile_and_rank(
+        median_ward_df_rank, "weighted_median"
+    )
+    create_ward_map(weighted_median_ward_df_rank, start_date, end_date, day_type_suffix)

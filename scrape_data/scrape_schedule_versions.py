@@ -87,9 +87,13 @@ def fetch_schedule_versions(month: int, year: int) -> List[pendulum.date]:
             f" The duplicate schedule versions are"
             f" {set(duplicates)}. Check whether these were in-effect."
         )
+        # Keep the first occurrence of duplicates.
+        # This will be the schedule that was left on the CTA website
+        # the longest.
+        date_list = pd.Series(date_list).drop_duplicates()
 
     return sorted(
-        set([pendulum.parse(date, strict=False).date() for date in date_list])
+        [pendulum.parse(date, strict=False).date() for date in date_list]
     )
 
 

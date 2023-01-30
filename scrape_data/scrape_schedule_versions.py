@@ -21,14 +21,10 @@ def check_latest_rt_data_date() -> str:
         str: A string of the latest date in YYYY-MM-DD format.
     """
     if pendulum.now("America/Chicago").hour >= 11:
-        end_date = (
-            pendulum.yesterday("America/Chicago")
-            .date().format('YYYY-MM-DD')
-        )
+        end_date = pendulum.yesterday("America/Chicago").date().format("YYYY-MM-DD")
     else:
         end_date = (
-            pendulum.now("America/Chicago").subtract(days=2)
-            .date().format('YYYY-MM-DD')
+            pendulum.now("America/Chicago").subtract(days=2).date().format("YYYY-MM-DD")
         )
     return end_date
 
@@ -55,9 +51,9 @@ def fetch_schedule_versions(month: int, year: int) -> List[pendulum.date]:
         response = requests.get(url).content
         soup = BeautifulSoup(response, "lxml")
         # List of dates from first row
-        table = soup.find_all('table')
-        for row in table[0].tbody.find_all('tr'):
-            first_col = row.find_all('td')[0]
+        table = soup.find_all("table")
+        for row in table[0].tbody.find_all("tr"):
+            first_col = row.find_all("td")[0]
             date = pendulum.parse(first_col.text.strip(), strict=False)
             # Find schedules up to and including the specified date.
             if date.month == month and date.year == year:
@@ -92,9 +88,7 @@ def fetch_schedule_versions(month: int, year: int) -> List[pendulum.date]:
         # the longest.
         date_list = pd.Series(date_list).drop_duplicates()
 
-    return sorted(
-        [pendulum.parse(date, strict=False).date() for date in date_list]
-    )
+    return sorted([pendulum.parse(date, strict=False).date() for date in date_list])
 
 
 def modify_data_collection_start(date_list: List[pendulum.date]) -> List[pendulum.date]:
@@ -123,9 +117,8 @@ def modify_data_collection_start(date_list: List[pendulum.date]) -> List[pendulu
 
 
 def calculate_version_date_ranges(
-    month: int,
-    year: int,
-        start2022: bool = True) -> Tuple[List[pendulum.date], List[Tuple[pendulum.date, pendulum.date]]]:
+    month: int, year: int, start2022: bool = True
+) -> Tuple[List[pendulum.date], List[Tuple[pendulum.date, pendulum.date]]]:
     """Get the start and end dates for each schedule version from the most
         recent version to the version specified by the month and year
 
@@ -150,7 +143,7 @@ def calculate_version_date_ranges(
         try:
             date_tuple = (
                 schedule_list[i].add(days=1),
-                schedule_list[i+1].subtract(days=1)
+                schedule_list[i + 1].subtract(days=1),
             )
             start_end_list.append(date_tuple)
         except IndexError:
@@ -158,15 +151,14 @@ def calculate_version_date_ranges(
 
     # Handle the current schedule version by setting the end date as the latest
     # available date for data.
-    start_end_list.append(
-        (schedule_list[-1].add(days=1), check_latest_rt_data_date())
-    )
+    start_end_list.append((schedule_list[-1].add(days=1), check_latest_rt_data_date()))
     return schedule_list, start_end_list
 
 
 def create_schedule_list_dict(
     schedule_list: List[pendulum.date],
-        start_end_list: List[Tuple[pendulum.date, pendulum.date]]) -> List[dict]:
+    start_end_list: List[Tuple[pendulum.date, pendulum.date]],
+) -> List[dict]:
     """Create a list of dictionaries with keys for the schedule_version,
        start_date, and end_date
 
@@ -188,7 +180,7 @@ def create_schedule_list_dict(
         schedule_dict = {
             "schedule_version": version.format("YYYYMMDD"),
             "feed_start_date": start_date.format("YYYY-MM-DD"),
-            "feed_end_date": end_date.format("YYYY-MM-DD")
+            "feed_end_date": end_date.format("YYYY-MM-DD"),
         }
         schedule_list_dict.append(schedule_dict)
     return schedule_list_dict
@@ -210,11 +202,8 @@ def create_schedule_list(month: int, year: int, start2022: bool = True) -> List[
             corresponding to each schedule version.
     """
     schedule_list, start_end_list = calculate_version_date_ranges(
-        month=month,
-        year=year,
-        start2022=start2022
+        month=month, year=year, start2022=start2022
     )
     return create_schedule_list_dict(
-        schedule_list=schedule_list,
-        start_end_list=start_end_list
+        schedule_list=schedule_list, start_end_list=start_end_list
     )

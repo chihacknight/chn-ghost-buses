@@ -84,8 +84,13 @@ def fetch_schedule_versions(month: int, year: int) -> List[pendulum.date]:
             f" {set(duplicates)}. Check whether these were in-effect."
         )
         # Keep the first occurrence of duplicates.
-        # This will be the schedule that was left on the CTA website
-        # the longest.
+        # date_list is returned from Transitfeeds from newest to oldest
+        # [...'14 September 2021', '7 September 2021', '1 September 2021',
+        #  '1 September 2021', '1 September 2021', '1 September 2021',
+        #  '1 September 2021', '2 August 2021', '15 June 2021',..]
+        # By keeping the first entry, the entry that appears
+        # first on TransitFeeds site will be kept, which is the version that 
+        # was left on the CTA website the longest.
         date_list = pd.Series(date_list).drop_duplicates()
 
     return sorted([pendulum.parse(date, strict=False).date() for date in date_list])

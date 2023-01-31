@@ -1061,8 +1061,44 @@ def merge_ridership_combined(
         combined_long_df (pd.DataFrame): The first element of the output from
             the compare_scheduled_and_rt.main or the saved csv file from
             the MVP in the data_output directory
+
+            Data columns (total 7 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   date              17370 non-null  object
+            1   route_id          17370 non-null  object
+            2   trip_count_rt     17370 non-null  int64
+            3   trip_count_sched  17370 non-null  int64
+            4   dayofweek         17370 non-null  int64
+            5   day_type          17370 non-null  object
+            6   feed_version      17370 non-null  int64
+
+            Example:
+            date        route_id  trip_count_rt  trip_count_sched  dayofweek day_type  feed_version
+        0  2022-05-20        1             43                59          4       wk      20220507
+        1  2022-05-20      100             33                53          4       wk      20220507
+        2  2022-05-20      103             80               132          4       wk      20220507
+        3  2022-05-20      106            121               134          4       wk      20220507
+        4  2022-05-20      108             34                71          4       wk      20220507
+
         ridership_df (pd.DataFrame): Ridership data taken from the
             fetch_ridership function
+                    Data columns (total 4 columns):
+        #   Column   Non-Null Count   Dtype
+        ---  ------   --------------   -----
+        0   route    963408 non-null  object
+        1   date     963408 non-null  datetime64[ns]
+        2   daytype  963408 non-null  object
+        3   rides    963408 non-null  int64
+
+        Example:
+            route       date      daytype   rides
+        0     3     2001-01-01       U      7354
+        1     4     2001-01-01       U      9288
+        2     6     2001-01-01       U      6048
+        3     8     2001-01-01       U      6309
+        4     9     2001-01-01       U      11207
+
         start_date (str): The beginning of data collection from
             combined_long_df
         ridership_end_date (str): The end of data collection from the
@@ -1099,6 +1135,22 @@ def make_descriptive_plots(
             and scheduled trips per route per day
         summary_df (pd.DataFrame): A DataFrame of actual trips and scheduled
             trips per route
+                    Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   route_id          424 non-null    object
+        1   day_type          424 non-null    object
+        2   trip_count_rt     424 non-null    int64
+        3   trip_count_sched  424 non-null    int64
+        4   ratio             424 non-null    float64
+
+        Example:
+            route_id day_type  trip_count_rt  trip_count_sched  ratio
+        0        1      hol             47                59  0.796610
+        1        1       wk           4978              6112  0.814463
+        2      100      hol             38                53  0.716981
+        3      100       wk           4766              5560  0.857194
+        4      103      hol            303               342  0.885965
     """
     combined_long_df = combined_long_df.copy()
 
@@ -1226,8 +1278,44 @@ def calculate_ratio_per_ward(
     """
     Args:
         ward_df (pd.DataFrame): DataFrame containing all routes
-            passing through a ward
+            passing through a ward.
+
+            Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   ward              50 non-null     int64
+        1   trip_count_rt     50 non-null     int64
+        2   trip_count_sched  50 non-null     int64
+        3   ratio             50 non-null     float64
+        4   routes            50 non-null     object
+        The columns of interest are ward and routes.
+
+        Example:
+                ward   routes
+        0     1  [49, 50, 56, 65, 66, 70, 72, 73, 74, 76, 9, 94...
+        1     2  [120, 121, 124, 125, 134, 135, 136, 143, 146, ...
+        2     3  [1, 12, 146, 15, 18, 192, 2, 21, 24, 26, 29, 3...
+        3     4  [1, 12, 126, 143, 146, 147, 148, 15, 172, 18, ...
+        4     5  [15, 171, 172, 192, 2, 26, 28, 30, 4, 5, 55, 5...
+
         summary_df (pd.DataFrame): DataFrame containing trip ratio per route
+
+                Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   route_id          424 non-null    object
+        1   day_type          424 non-null    object
+        2   trip_count_rt     424 non-null    int64
+        3   trip_count_sched  424 non-null    int64
+        4   ratio             424 non-null    float64
+
+        Example:
+            route_id day_type  trip_count_rt  trip_count_sched  ratio
+        0        1      hol             47                59  0.796610
+        1        1       wk           4978              6112  0.814463
+        2      100      hol             38                53  0.716981
+        3      100       wk           4766              5560  0.857194
+        4      103      hol            303               342  0.885965
 
     Returns:
         pd.DataFrame: DataFrame containing median and weighted median
@@ -1244,6 +1332,14 @@ def calculate_ratio_per_ward(
         .rename(columns={"index": "route_id", "route_id": "count"})
     )
     merged_df = merged_df.merge(freq_df, on="route_id")
+    # Count is the number of routes passing through a particular ward
+    # Example
+    #         ward  count
+    # 1890    37     32
+    # 2562    27     64
+    # 1068    14     36
+    # 1732    37     32
+    # 2550    36     64
     merged_df["weights"] = 1 / merged_df["count"]
     medians = merged_df.groupby("ward").agg(median=("ratio", "median"))
     weighted_medians = merged_df.groupby("ward").apply(
@@ -1281,6 +1377,23 @@ def create_ward_map(
     Args:
         ward_df (pd.DataFrame): A DataFrame containing routes
             passing through a ward
+                    Data columns (total 5 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   ward              50 non-null     int64
+            1   trip_count_rt     50 non-null     int64
+            2   trip_count_sched  50 non-null     int64
+            3   ratio             50 non-null     float64
+            4   routes            50 non-null     object
+            The columns of interest are ward and routes.
+
+            Example:
+                    ward   routes
+            0     1  [49, 50, 56, 65, 66, 70, 72, 73, 74, 76, 9, 94...
+            1     2  [120, 121, 124, 125, 134, 135, 136, 143, 146, ...
+            2     3  [1, 12, 146, 15, 18, 192, 2, 21, 24, 26, 29, 3...
+            3     4  [1, 12, 126, 143, 146, 147, 148, 15, 172, 18, ...
+            4     5  [15, 171, 172, 192, 2, 26, 28, 30, 4, 5, 55, 5...
         start_date (str): The start of the data series
         end_date (str): The end of the data series
         day_type_suffix (str): The type of day of the data.
@@ -1386,7 +1499,25 @@ def make_ward_maps(summary_df: pd.DataFrame, start_date: str, end_date: str) -> 
     """Prepare data for ward maps and plot them
 
     Args:
-        summary_df (pd.DataFrame): DataFrame containing trip ratio for each route
+        summary_df (pd.DataFrame): DataFrame containing trip ratio for each
+            route
+                Data columns (total 5 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   route_id          424 non-null    object
+            1   day_type          424 non-null    object
+            2   trip_count_rt     424 non-null    int64
+            3   trip_count_sched  424 non-null    int64
+            4   ratio             424 non-null    float64
+
+            Example:
+                route_id day_type  trip_count_rt  trip_count_sched  ratio
+            0        1      hol             47                59  0.796610
+            1        1       wk           4978              6112  0.814463
+            2      100      hol             38                53  0.716981
+            3      100       wk           4766              5560  0.857194
+            4      103      hol            303               342  0.885965
+
         start_date (str): The start of the data series
         end_date (str): The end of the date series
     """

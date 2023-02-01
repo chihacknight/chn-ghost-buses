@@ -1329,18 +1329,18 @@ def calculate_ratio_per_ward(
         merged_df["route_id"]
         .value_counts()
         .reset_index()
-        .rename(columns={"index": "route_id", "route_id": "count"})
+        .rename(columns={"index": "route_id", "route_id": "routes_per_ward"})
     )
     merged_df = merged_df.merge(freq_df, on="route_id")
-    # Count is the number of routes passing through a particular ward
+    # routes_per_ward is the number of routes passing through a particular ward
     # Example
-    #         ward  count
+    #         ward  routes_per_ward
     # 1890    37     32
     # 2562    27     64
     # 1068    14     36
     # 1732    37     32
     # 2550    36     64
-    merged_df["weights"] = 1 / merged_df["count"]
+    merged_df["weights"] = 1 / merged_df["routes_per_ward"]
     medians = merged_df.groupby("ward").agg(median=("ratio", "median"))
     weighted_medians = merged_df.groupby("ward").apply(
         weighted_median, "ratio", "weights"

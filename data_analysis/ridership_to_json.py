@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import pandas as pd
 import calendar
+# Typer doesn't support pandas DataFrames
 import argparse
 
 project_name = os.getenv('PROJECT_NAME', 'chn-ghost-buses')

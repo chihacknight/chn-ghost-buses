@@ -652,12 +652,10 @@ def set_day_type_suffix(df: pd.DataFrame) -> str:
             all_day_types when there is a mix of day types
     """
     df = df.copy()
-    day_suffix = None
+    day_suffix = "all_day_types"
     for day_type in DAY_NAMES.keys():
         if (df["day_type"].loc[df["day_type"].notnull()] == day_type).all():
             day_suffix = day_type
-    if day_suffix is None:
-        day_suffix = "all_day_types"
     return day_suffix
 
 

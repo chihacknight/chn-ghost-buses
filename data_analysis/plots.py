@@ -1,59 +1,48 @@
-from datetime import datetime
 import os
+from datetime import datetime
 from pathlib import Path
-from typing import Union, List
+from typing import List, Union
 
 import matplotlib
-matplotlib.use('QtAgg')
+
+matplotlib.use("QtAgg")
 
 import logging
-import folium
-from branca.colormap import LinearColormap
-import geopandas as gpd
-import pandas as pd
-import numpy as np
-import mapclassify
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.tsa.stattools import kpss
 
+import chart_studio.plotly as py
+import folium
+import geopandas as gpd
+import mapclassify
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import weightedstats
+from branca.colormap import LinearColormap
+from statsmodels.tsa.stattools import adfuller, kpss
 
 import data_analysis.compare_scheduled_and_rt as compare_scheduled_and_rt
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
-import plotly.express as px
-import plotly.graph_objects as go
-import chart_studio.plotly as py
-
 
 CHICAGO_COORDINATES = (41.85, -87.68)
 
 # Return the project root directory
 # https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
-project_name = os.getenv('PROJECT_NAME', 'chn-ghost-buses')
+project_name = os.getenv("PROJECT_NAME", "chn-ghost-buses")
 current_dir = Path(__file__)
-project_dir = next(
-    p for p in current_dir.parents
-    if p.name == f'{project_name}'
-)
-PLOTS_PATH = project_dir / 'plots' / 'scratch'
-DATA_PATH = project_dir / 'data_output' / 'scratch'
+project_dir = next(p for p in current_dir.parents if p.name == f"{project_name}")
+PLOTS_PATH = project_dir / "plots" / "scratch"
+DATA_PATH = project_dir / "data_output" / "scratch"
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
 
-DAY_NAMES = {
-        'wk': 'Weekday',
-        'hol': 'Holiday',
-        'sat': 'Saturday',
-        'sun': 'Sunday'
-    }
+DAY_NAMES = {"wk": "Weekday", "hol": "Holiday", "sat": "Saturday", "sun": "Sunday"}
 
 
 # https://stackoverflow.com/questions/52503899/
 # format-round-numerical-legend-label-in-geopandas
-def legend_formatter(
-    df: gpd.GeoDataFrame,
-    var: str,
-        decimals: str = '0f') -> List[str]:
+def legend_formatter(df: gpd.GeoDataFrame, var: str, decimals: str = "0f") -> List[str]:
     """Format the bounds for categorical variable to remove brackets
         and add comma separators for large numbers
 
@@ -74,12 +63,12 @@ def legend_formatter(
         if index == 0:
             lower_bound = df[var].min()
         else:
-            lower_bound = upper_bounds[index-1]
+            lower_bound = upper_bounds[index - 1]
         if np.isnan(upper_bound):
             upper_bound = df[var].max()
 
         # format the numerical legend here
-        bound = f'{lower_bound:,.{decimals}} - {upper_bound:,.{decimals}}'
+        bound = f"{lower_bound:,.{decimals}} - {upper_bound:,.{decimals}}"
         bounds.append(bound)
     return bounds
 
@@ -89,7 +78,8 @@ def n_worst_best_routes(
     col: str,
     n: int = 10,
     percentile: bool = True,
-        worst: bool = True) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+    worst: bool = True,
+) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """Returns the n route_ids with the lowest or highest ratio
        of completed trips
 
@@ -113,25 +103,19 @@ def n_worst_best_routes(
 
     if worst:
         if percentile:
-            return (
-                df.loc[df[f'{col}_percentiles'] <= n/100]
-            )
+            return df.loc[df[f"{col}_percentiles"] <= n / 100]
         else:
             # Drop duplicates so that there are n unique routes
             # instead of duplicated routes when taking direction into account.
-            return (
-                df.sort_values(by=f"{col}")
-                .drop_duplicates('route_id').head(n)
-            )
+            return df.sort_values(by=f"{col}").drop_duplicates("route_id").head(n)
     else:
         if percentile:
-            return (
-                df.loc[df[f'{col}_percentiles'] >= (100-n)/100]
-            )
+            return df.loc[df[f"{col}_percentiles"] >= (100 - n) / 100]
         else:
             return (
                 df.sort_values(by=f"{col}", ascending=False)
-                .drop_duplicates('route_id').head(n)
+                .drop_duplicates("route_id")
+                .head(n)
             )
 
 
@@ -146,24 +130,22 @@ def create_save_path(save_name: str, dir_name: Path = PLOTS_PATH) -> str:
     Returns:
         str: A full path with the directory and filename
     """
-    return str(
-        dir_name / f'{save_name}'
-        f'_{datetime.now().strftime("%Y-%m-%d")}'
-    )
+    return str(dir_name / f"{save_name}" f'_{datetime.now().strftime("%Y-%m-%d")}')
 
 
 def lineplot(
-        x: str,
-        y: str,
-        data: pd.DataFrame,
-        xlabel: str = None,
-        ylabel: str = None,
-        color_var: str = None,
-        show: bool = False,
-        title: str = None,
-        save: bool = True,
-        save_name: str = None,
-        rolling_median: bool = False) -> None:
+    x: str,
+    y: str,
+    data: pd.DataFrame,
+    xlabel: str = None,
+    ylabel: str = None,
+    color_var: str = None,
+    show: bool = False,
+    title: str = None,
+    save: bool = True,
+    save_name: str = None,
+    rolling_median: bool = False,
+) -> None:
     """Plot a line plot using Plotly
 
     Args:
@@ -185,7 +167,7 @@ def lineplot(
     data = data.copy()
     fig = go.Figure()
     if color_var is not None:
-        if color_var == 'day_type':
+        if color_var == "day_type":
             labels = DAY_NAMES
             labels[color_var] = "Day Type"
 
@@ -195,31 +177,23 @@ def lineplot(
                 y1 = sub_df[y].values
 
                 # Use markers only for holidays and line+markers for weekends
-                if day_type == 'hol':
-                    fig.add_trace(go.Scatter(
-                        x=x1,
-                        y=y1,
-                        name=labels[day_type],
-                        mode='markers'
-                    ))
-                elif day_type == 'sat' or day_type == 'sun':
-                    fig.add_trace(go.Scatter(
-                        x=x1,
-                        y=y1,
-                        name=labels[day_type],
-                        mode='lines+markers'
-                    ))
+                if day_type == "hol":
+                    fig.add_trace(
+                        go.Scatter(x=x1, y=y1, name=labels[day_type], mode="markers")
+                    )
+                elif day_type == "sat" or day_type == "sun":
+                    fig.add_trace(
+                        go.Scatter(
+                            x=x1, y=y1, name=labels[day_type], mode="lines+markers"
+                        )
+                    )
                 else:
-                    fig.add_trace(go.Scatter(
-                        x=x1,
-                        y=y1,
-                        name=labels[day_type]
-                    ))
+                    fig.add_trace(go.Scatter(x=x1, y=y1, name=labels[day_type]))
             fig.update_layout(
                 title=title,
                 xaxis_title=xlabel,
                 yaxis_title=ylabel,
-                legend_title="Day Type"
+                legend_title="Day Type",
             )
         else:
             for val in data[color_var].unique():
@@ -227,37 +201,18 @@ def lineplot(
                 x1 = sub_df[x].values
                 y1 = sub_df[y].values
 
-                fig.add_trace(go.Scatter(
-                    x=x1,
-                    y=y1,
-                    name=val
-                ))
-            fig.update_layout(
-                title=title,
-                xaxis_title=xlabel,
-                yaxis_title=ylabel
-            )
+                fig.add_trace(go.Scatter(x=x1, y=y1, name=val))
+            fig.update_layout(title=title, xaxis_title=xlabel, yaxis_title=ylabel)
     else:
         x1 = data[x].values
         y1 = data[y].values
 
-        fig.add_trace(go.Scatter(
-            x=x1,
-            y=y1,
-            showlegend=False
-        ))
+        fig.add_trace(go.Scatter(x=x1, y=y1, showlegend=False))
         if rolling_median:
-            rolling_m = data.set_index(x)[y].rolling('7D').median().values
-            fig.add_trace(go.Scatter(
-                x=x1,
-                y=rolling_m,
-                name='Rolling 7-day median'
-            ))
+            rolling_m = data.set_index(x)[y].rolling("7D").median().values
+            fig.add_trace(go.Scatter(x=x1, y=rolling_m, name="Rolling 7-day median"))
             fig.update_layout(
-                title=title,
-                xaxis_title=xlabel,
-                yaxis_title=ylabel,
-                showlegend=True
+                title=title, xaxis_title=xlabel, yaxis_title=ylabel, showlegend=True
             )
 
     if show:
@@ -265,12 +220,12 @@ def lineplot(
 
     if save:
         if save_name is None:
-            save_name = f'lineplot_of_{y}_over_{x}'
+            save_name = f"lineplot_of_{y}_over_{x}"
         save_path = create_save_path(save_name)
-        logger.info(f'Saving to {save_path}')
-        fig.write_html(f'{save_path}.html')
-        fig.write_image(f'{save_path}.png')
-        logger.info('Saving to Chart Studio')
+        logger.info(f"Saving to {save_path}")
+        fig.write_html(f"{save_path}.html")
+        fig.write_image(f"{save_path}.png")
+        logger.info("Saving to Chart Studio")
         py.plot(fig, filename=f"{save_name}", auto_open=False)
 
 
@@ -282,7 +237,8 @@ def scatterplot(
     show: bool = False,
     save: bool = True,
     save_name: str = None,
-        **kwargs: dict) -> None:
+    **kwargs: dict,
+) -> None:
     """Scatter plot with OLS trendline
 
     Args:
@@ -299,7 +255,7 @@ def scatterplot(
     fig = px.scatter(x=x, y=y, labels={x: xlabel, y: ylabel}, **kwargs)
 
     for a in fig.layout.annotations:
-        a.text = a.text.split('=')[1]
+        a.text = a.text.split("=")[1]
         a.text = DAY_NAMES[a.text]
 
     if show:
@@ -307,26 +263,27 @@ def scatterplot(
 
     if save:
         if save_name is None:
-            save_name = f'scatterplot_of_{y}_by_{x}'
+            save_name = f"scatterplot_of_{y}_by_{x}"
         save_path = create_save_path(save_name)
-        logger.info(f'Saving to {save_path}')
-        fig.write_html(f'{save_path}.html')
-        fig.write_image(f'{save_path}.png')
-        logger.info('Saving to Chart Studio')
+        logger.info(f"Saving to {save_path}")
+        fig.write_html(f"{save_path}.html")
+        fig.write_image(f"{save_path}.png")
+        logger.info("Saving to Chart Studio")
         py.plot(fig, filename=f"{save_name}", auto_open=False)
 
 
 def boxplot(
-        x: str,
-        y: str,
-        data: pd.DataFrame,
-        xlabel: str = None,
-        ylabel: str = None,
-        show: bool = False,
-        title: str = None,
-        save: bool = True,
-            save_name: str = None) -> None:
-    """ Make a boxplot and save the figure
+    x: str,
+    y: str,
+    data: pd.DataFrame,
+    xlabel: str = None,
+    ylabel: str = None,
+    show: bool = False,
+    title: str = None,
+    save: bool = True,
+    save_name: str = None,
+) -> None:
+    """Make a boxplot and save the figure
 
     Args:
         x (str): the variable to plot by
@@ -340,7 +297,7 @@ def boxplot(
         save_name (str, optional): Name of the saved boxplot. Defaults to None.
     """
     data = data.copy()
-    if x == 'day_type':
+    if x == "day_type":
         data.replace({x: DAY_NAMES}, inplace=True)
     labels = {}
     if xlabel is not None:
@@ -348,33 +305,25 @@ def boxplot(
     if ylabel is not None:
         labels[y] = ylabel
 
-    fig = px.box(
-        data_frame=data,
-        x=x,
-        y=y,
-        title=title,
-        labels=labels
-    )
+    fig = px.box(data_frame=data, x=x, y=y, title=title, labels=labels)
     if show:
         fig.show()
 
     if save:
         if save_name is None:
-            save_name = f'boxplot_of_{y}_by_{x}'
+            save_name = f"boxplot_of_{y}_by_{x}"
         save_path = create_save_path(save_name)
-        logger.info(f'Saving to {save_path}')
-        fig.write_html(f'{save_path}.html')
-        fig.write_image(f'{save_path}.png')
-        logger.info('Saving to Chart Studio')
+        logger.info(f"Saving to {save_path}")
+        fig.write_html(f"{save_path}.html")
+        fig.write_image(f"{save_path}.png")
+        logger.info("Saving to Chart Studio")
         py.plot(fig, filename=f"{save_name}", auto_open=False)
 
 
 def plot_map(
-    geo_df: gpd.GeoDataFrame,
-    save_name: str,
-    save: bool = True,
-        **kwargs: dict) -> folium.Map:
-    """ Create a map of bus routes from GeoDataFrame
+    geo_df: gpd.GeoDataFrame, save_name: str, save: bool = True, **kwargs: dict
+) -> folium.Map:
+    """Create a map of bus routes from GeoDataFrame
 
     Args:
         geo_df (gpd.GeoDataFrame): DataFrame with bus routes, GPS coordinates,
@@ -392,8 +341,8 @@ def plot_map(
     geo_df[date_columns] = geo_df[date_columns].astype(str)
     newmap = geo_df.explore(**kwargs)
     if save:
-        save_path = create_save_path(f'{save_name}')
-        logger.info(f'Saving to {save_path}')
+        save_path = create_save_path(f"{save_name}")
+        logger.info(f"Saving to {save_path}")
         newmap.save(f"{save_path}.html")
     return newmap
 
@@ -410,11 +359,11 @@ def fetch_ridership_data() -> pd.DataFrame:
 
     ridership_by_rte_date = pd.read_csv(
         "https://data.cityofchicago.org/api/views/"
-        "jyb9-n7fm/rows.csv?accessType=DOWNLOAD")
+        "jyb9-n7fm/rows.csv?accessType=DOWNLOAD"
+    )
 
-    ridership_by_rte_date.loc[:, 'date'] = pd.to_datetime(
-        ridership_by_rte_date.loc[:, 'date'],
-        infer_datetime_format=True
+    ridership_by_rte_date.loc[:, "date"] = pd.to_datetime(
+        ridership_by_rte_date.loc[:, "date"], infer_datetime_format=True
     )
     return ridership_by_rte_date
 
@@ -433,36 +382,26 @@ def create_ridership_map(mvp: bool = False) -> None:
 
     if mvp:
         logger.info(
-            "Keeping ridership data between 2022-05-20"
-            " and 2022-07-31 for MVP"
+            "Keeping ridership data between 2022-05-20" " and 2022-07-31 for MVP"
         )
         # Date range from 2022-05-20 to 2022-07-31 used in MVP
-        ridership_by_rte_date = (
-            ridership_by_rte_date.loc[
-                (ridership_by_rte_date['date'] >= "2022-05-20")
-                & (ridership_by_rte_date['date'] <= "2022-07-31")
-            ]
-        )
+        ridership_by_rte_date = ridership_by_rte_date.loc[
+            (ridership_by_rte_date["date"] >= "2022-05-20")
+            & (ridership_by_rte_date["date"] <= "2022-07-31")
+        ]
     else:
         logger.info("Keeping ridership data from 2022-05-20 onward")
-        ridership_by_rte_date = (
-            ridership_by_rte_date.loc[
-                (ridership_by_rte_date['date'] >= "2022-05-20")
-            ]
-        )
+        ridership_by_rte_date = ridership_by_rte_date.loc[
+            (ridership_by_rte_date["date"] >= "2022-05-20")
+        ]
 
-    start_date = ridership_by_rte_date['date'].min().strftime('%Y-%m-%d')
-    end_date = ridership_by_rte_date['date'].max().strftime('%Y-%m-%d')
+    start_date = ridership_by_rte_date["date"].min().strftime("%Y-%m-%d")
+    end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
 
     # Total number of riders per route
-    ridership_by_rte = (
-        ridership_by_rte_date
-        .groupby('route')
-        .sum()
-        .reset_index()
-    )
+    ridership_by_rte = ridership_by_rte_date.groupby("route").sum().reset_index()
 
-    ridership_by_rte.rename(columns={'route': 'route_id'}, inplace=True)
+    ridership_by_rte.rename(columns={"route": "route_id"}, inplace=True)
 
     logger.info("Creating GeoDataFrame")
 
@@ -480,45 +419,40 @@ def create_ridership_map(mvp: bool = False) -> None:
         "scheme": "Quantiles",
         "m": chicago_map,
         "legend_kwds": {
-            'caption': 'Number of Riders',
-            'colorbar': False,
-            'labels': bounds
+            "caption": "Number of Riders",
+            "colorbar": False,
+            "labels": bounds,
         },
         "legend": True,
         "categorical": False,
-        "k": 5
+        "k": 5,
     }
     logger.info("Creating map of ridership by route binned by quintile")
     _ = plot_map(
         rider_gdf_geo,
         save_name=f"all_routes_quantiles_{start_date}_to_{end_date}_{kwargs['column']}",
-        **kwargs
+        **kwargs,
     )
 
     # Remove key from kwargs
-    kwargs.pop('scheme', None)
-    kwargs.pop('k', None)
-    kwargs['legend_kwds'].pop('labels', None)
+    kwargs.pop("scheme", None)
+    kwargs.pop("k", None)
+    kwargs["legend_kwds"].pop("labels", None)
     # Dictionary keys are popped when passed to explore,
     # so must be added again.
-    kwargs['legend_kwds']['caption'] = 'Number of Riders'
-    kwargs['legend_kwds']['colorbar'] = False
+    kwargs["legend_kwds"]["caption"] = "Number of Riders"
+    kwargs["legend_kwds"]["colorbar"] = False
 
     # Background map must be re-created to get a clear map between runs
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
-    kwargs['m'] = chicago_map
+    kwargs["m"] = chicago_map
 
-    plotted_map = plot_map(
-        rider_gdf_geo,
-        save=False,
-        save_name='',
-        **kwargs
-    )
+    plotted_map = plot_map(rider_gdf_geo, save=False, save_name="", **kwargs)
     # Manually specify plasma colormap to avoid overlapping labels
     # See https://www.kennethmoreland.com/color-advice/
     # :~:text=Plasma,der%20Walt%20and%20Nathaniel%20Smith.
-    kwargs['legend_kwds']['caption'] = 'Number of Riders'
-    kwargs['legend_kwds']['colorbar'] = False
+    kwargs["legend_kwds"]["caption"] = "Number of Riders"
+    kwargs["legend_kwds"]["colorbar"] = False
     lcm = LinearColormap(
         colors=[
             (13, 8, 135),
@@ -528,23 +462,24 @@ def create_ridership_map(mvp: bool = False) -> None:
             (219, 92, 104),
             (244, 136, 73),
             (254, 188, 43),
-            (240, 249, 33)
+            (240, 249, 33),
         ],
         vmin=0,
         vmax=rider_gdf_geo[kwargs["column"]].max(),
-        caption=kwargs["legend_kwds"]["caption"]
+        caption=kwargs["legend_kwds"]["caption"],
     )
     logger.info("Creating map of ridership totals by route")
     lcm.add_to(plotted_map)
 
-    save_name = f'all_routes_numeric_{start_date}_to_{end_date}'
+    save_name = f"all_routes_numeric_{start_date}_to_{end_date}"
 
     save_path = create_save_path(f'{save_name}_{kwargs["column"]}')
     plotted_map.save(f"{save_path}.html")
 
 
-def groupby_long_df(df: pd.DataFrame,
-                    groupbyvars: Union[List[str], str]) -> pd.DataFrame:
+def groupby_long_df(
+    df: pd.DataFrame, groupbyvars: Union[List[str], str]
+) -> pd.DataFrame:
     """Group DataFrame by groupbyvars
 
     Args:
@@ -558,18 +493,15 @@ def groupby_long_df(df: pd.DataFrame,
             vars and a trip ratio column.
     """
     df = df.copy()
-    df.loc[:, 'date'] = pd.to_datetime(df.loc[:, 'date'])
+    df.loc[:, "date"] = pd.to_datetime(df.loc[:, "date"])
 
     df = (
-        df.groupby(groupbyvars)[['trip_count_rt', 'trip_count_sched']]
+        df.groupby(groupbyvars)[["trip_count_rt", "trip_count_sched"]]
         .sum()
         .reset_index()
     )
 
-    df['ratio'] = (
-        df['trip_count_rt']
-        / df['trip_count_sched']
-    )
+    df["ratio"] = df["trip_count_rt"] / df["trip_count_sched"]
 
     return df
 
@@ -587,20 +519,16 @@ def calculate_percentile_and_rank(df: pd.DataFrame, col: str) -> pd.DataFrame:
             percentiles and rank added.
     """
     df = df.copy()
-    df[f'{col}_percentiles'] = df[col].rank(
-        pct=True
-    )
-    df[f'{col}_ranking'] = (
-        df[col]
-        .rank(method='dense', na_option='top', ascending=False)
+    df[f"{col}_percentiles"] = df[col].rank(pct=True)
+    df[f"{col}_ranking"] = df[col].rank(
+        method="dense", na_option="top", ascending=False
     )
     return df
 
 
 def make_map(
-    summary_gdf_geo: gpd.GeoDataFrame,
-    save_name: str,
-        summary_kwargs: dict) -> None:
+    summary_gdf_geo: gpd.GeoDataFrame, save_name: str, summary_kwargs: dict
+) -> None:
     """Plot a map of trip ratio from given DataFrame
 
     Args:
@@ -615,17 +543,12 @@ def make_map(
     chicago_map = folium.Map(location=CHICAGO_COORDINATES, zoom_start=10)
     summary_kwargs["m"] = chicago_map
 
-    _ = plot_map(
-            summary_gdf_geo,
-            save_name=save_name,
-            **summary_kwargs
-        )
+    _ = plot_map(summary_gdf_geo, save_name=save_name, **summary_kwargs)
 
 
 def plot_and_save(
-    summary_gdf_geo: gpd.GeoDataFrame,
-    summary_kwargs: dict,
-        save_name: str) -> None:
+    summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name: str
+) -> None:
     """Plot a map from the data input and save it
 
     Args:
@@ -640,7 +563,7 @@ def plot_and_save(
     make_map(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     path_name = create_save_path(save_name, DATA_PATH)
@@ -649,16 +572,16 @@ def plot_and_save(
     first_cols = summary_gdf_geo.columns[:2].tolist()
     last_cols = summary_gdf_geo.columns[-10:].to_list()
     kwargs_cols = summary_gdf_geo.columns[
-        summary_gdf_geo.columns.str.startswith(summary_kwargs['column'])
+        summary_gdf_geo.columns.str.startswith(summary_kwargs["column"])
     ].tolist()
     cols = first_cols + kwargs_cols + last_cols
-    summary_gdf_geo[cols].to_file(f'{path_name}.json', driver='GeoJSON')
-    summary_gdf_geo[cols].to_html(f'{path_name}_table.html', index=False)
+    summary_gdf_geo[cols].to_file(f"{path_name}.json", driver="GeoJSON")
+    summary_gdf_geo[cols].to_html(f"{path_name}_table.html", index=False)
 
 
 def calculate_trips_per_rider(
-    merged_df: pd.DataFrame,
-        num_riders: int = 1000) -> pd.DataFrame:
+    merged_df: pd.DataFrame, num_riders: int = 1000
+) -> pd.DataFrame:
     """Calculate the number of trips per rider and per num_riders riders
 
     Args:
@@ -672,25 +595,25 @@ def calculate_trips_per_rider(
             of trips per rider and the number of trips per num_riders riders.
     """
     daily_means = (
-        merged_df.groupby(['route_id'])[['trip_count_rt', 'rides']]
+        merged_df.groupby(["route_id"])[["trip_count_rt", "rides"]]
         .mean()
         .round(1)
         .reset_index()
     )
 
-    daily_means['trips_per_rider'] = (
-        daily_means['trip_count_rt'] / daily_means['rides']
-    )
+    daily_means["trips_per_rider"] = daily_means["trip_count_rt"] / daily_means["rides"]
 
-    daily_means[f'trips_per_{num_riders}_riders'] = (
-        (daily_means['trips_per_rider'] * num_riders).round(1)
-    )
+    daily_means[f"trips_per_{num_riders}_riders"] = (
+        daily_means["trips_per_rider"] * num_riders
+    ).round(1)
 
     daily_means.rename(
         columns={
             "trip_count_rt": "avg_trip_count_rt",
             "rides": "avg_ridership",
-        }, inplace=True)
+        },
+        inplace=True,
+    )
 
     return daily_means
 
@@ -712,13 +635,13 @@ def filter_day_type(df: pd.DataFrame, day_type: str) -> pd.DataFrame:
     df = df.copy()
     day_types = list(DAY_NAMES.keys())
     if day_type not in day_types:
-        error_text = ", ".join(day_types[:-1]) + ', or ' + day_types[-1]
+        error_text = ", ".join(day_types[:-1]) + ", or " + day_types[-1]
         raise ValueError(f"day_type must be one of {error_text}")
-    return df.loc[df['day_type'] == day_type]
+    return df.loc[df["day_type"] == day_type]
 
 
 def set_day_type_suffix(df: pd.DataFrame) -> str:
-    """Set the day_type to be included in the filename of the 
+    """Set the day_type to be included in the filename of the
        saved output
 
     Args:
@@ -729,20 +652,16 @@ def set_day_type_suffix(df: pd.DataFrame) -> str:
             all_day_types when there is a mix of day types
     """
     df = df.copy()
-    day_suffix = None
+    day_suffix = "all_day_types"
     for day_type in DAY_NAMES.keys():
-        if (df['day_type']
-                .loc[df['day_type'].notnull()] == day_type).all():
+        if (df["day_type"].loc[df["day_type"].notnull()] == day_type).all():
             day_suffix = day_type
-    if day_suffix is None:
-        day_suffix = 'all_day_types'
     return day_suffix
 
 
 def make_all_maps(
-    summary_gdf_geo: gpd.GeoDataFrame,
-    start_date: str,
-        end_date: str) -> None:
+    summary_gdf_geo: gpd.GeoDataFrame, start_date: str, end_date: str
+) -> None:
     """Make all maps from data specified in run_mvp or main
 
     Args:
@@ -759,7 +678,7 @@ def make_all_maps(
         "column": "ratio",
         "legend_kwds": {
             "caption": "Ratio of Actual Trips to Scheduled Trips",
-            "max_labels": 5
+            "max_labels": 5,
         },
         "legend": True,
     }
@@ -770,35 +689,35 @@ def make_all_maps(
     plot_and_save(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Creating map of all routes by average trip count")
     summary_kwargs["column"] = "avg_trip_count_rt"
     summary_kwargs["legend_kwds"] = {
         "caption": "Daily average of actual trips",
-        "max_labels": 5
+        "max_labels": 5,
     }
 
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Creating map of all routes by average trip count per rider")
     summary_kwargs["column"] = "trips_per_1000_riders"
     summary_kwargs["legend_kwds"] = {
         "caption": "Trips per 1000 riders",
-        "max_labels": 5
+        "max_labels": 5,
     }
 
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=summary_gdf_geo,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Creating map of all routes binned by quintile")
@@ -809,31 +728,28 @@ def make_all_maps(
         "column": "ratio",
         "scheme": "Quantiles",
         "legend_kwds": {
-            'caption': "Ratio of Actual Trips to Scheduled Trips",
-            'colorbar': False,
-            'labels': bounds
+            "caption": "Ratio of Actual Trips to Scheduled Trips",
+            "colorbar": False,
+            "labels": bounds,
         },
         "legend": True,
         "categorical": False,
-        "k": 5
+        "k": 5,
     }
 
     make_map(
         summary_gdf_geo=summary_gdf_geo,
         save_name=f"all_routes_quantiles_{start_date}_to_{end_date}"
-                  f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
-        summary_kwargs=summary_kwargs_quantiles
+        f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
+        summary_kwargs=summary_kwargs_quantiles,
     )
 
-    bounds_trip_count_rt = legend_formatter(
-        summary_gdf_geo,
-        var="avg_trip_count_rt"
-    )
+    bounds_trip_count_rt = legend_formatter(summary_gdf_geo, var="avg_trip_count_rt")
     summary_kwargs_quantiles["column"] = "avg_trip_count_rt"
     summary_kwargs_quantiles["legend_kwds"] = {
         "caption": "Daily average of actual trips",
         "colorbar": False,
-        "labels": bounds_trip_count_rt
+        "labels": bounds_trip_count_rt,
     }
     logger.info(
         f"Creating map of all routes for {summary_kwargs_quantiles['column']}"
@@ -843,20 +759,19 @@ def make_all_maps(
     make_map(
         summary_gdf_geo=summary_gdf_geo,
         save_name=f"all_routes_quantiles_{start_date}_to_{end_date}"
-                  f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
-        summary_kwargs=summary_kwargs_quantiles
+        f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
+        summary_kwargs=summary_kwargs_quantiles,
     )
 
     bounds_trips_per_1000_riders = legend_formatter(
-        summary_gdf_geo,
-        var="trips_per_1000_riders"
+        summary_gdf_geo, var="trips_per_1000_riders"
     )
 
     summary_kwargs_quantiles["column"] = "trips_per_1000_riders"
     summary_kwargs_quantiles["legend_kwds"] = {
         "caption": "Daily average of actual trips per 1000 riders",
         "colorbar": False,
-        "labels": bounds_trips_per_1000_riders
+        "labels": bounds_trips_per_1000_riders,
     }
 
     logger.info(
@@ -866,56 +781,48 @@ def make_all_maps(
     make_map(
         summary_gdf_geo=summary_gdf_geo,
         save_name=f"all_routes_quantiles_{start_date}_to_{end_date}"
-                  f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
-        summary_kwargs=summary_kwargs_quantiles
+        f"_{summary_kwargs_quantiles['column']}_{day_suffix}",
+        summary_kwargs=summary_kwargs_quantiles,
     )
 
     logger.info("Creating map of worst performing routes")
 
-    worst_geo = n_worst_best_routes(
-        summary_gdf_geo,
-        col="ratio",
-        percentile=False
-    )
+    worst_geo = n_worst_best_routes(summary_gdf_geo, col="ratio", percentile=False)
 
-    summary_kwargs['legend_kwds'] = {
+    summary_kwargs["legend_kwds"] = {
         "caption": "Ratio of Actual Trips to Scheduled Trips"
     }
-    summary_kwargs['cmap'] = 'winter'
-    summary_kwargs['column'] = 'ratio'
+    summary_kwargs["cmap"] = "winter"
+    summary_kwargs["column"] = "ratio"
 
     save_name = f"worst_routes_{start_date}_to_{end_date}_{day_suffix}"
 
     plot_and_save(
-        summary_gdf_geo=worst_geo,
-        summary_kwargs=summary_kwargs,
-        save_name=save_name
+        summary_gdf_geo=worst_geo, summary_kwargs=summary_kwargs, save_name=save_name
     )
 
     worst_geo_trips = n_worst_best_routes(
-        summary_gdf_geo,
-        col="avg_trip_count_rt",
-        percentile=False
+        summary_gdf_geo, col="avg_trip_count_rt", percentile=False
     )
 
     summary_kwargs["legend_kwds"] = {"caption": "Daily average of actual trips"}
     summary_kwargs["cmap"] = "winter"
     summary_kwargs["column"] = "avg_trip_count_rt"
 
-    logger.info(f"Creating map of worst performing routes by {summary_kwargs['column']}")
+    logger.info(
+        f"Creating map of worst performing routes by {summary_kwargs['column']}"
+    )
 
     save_name = f"worst_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=worst_geo_trips,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Worst geo trips per 1000 riders")
     worst_geo_trips_per_1000_riders = n_worst_best_routes(
-        summary_gdf_geo,
-        col="trips_per_1000_riders",
-        percentile=False
+        summary_gdf_geo, col="trips_per_1000_riders", percentile=False
     )
 
     summary_kwargs["legend_kwds"] = {
@@ -925,40 +832,34 @@ def make_all_maps(
     summary_kwargs["cmap"] = "winter"
     summary_kwargs["column"] = "trips_per_1000_riders"
 
-    logger.info(f"Creating map of worst performing routes by {summary_kwargs['column']}")
+    logger.info(
+        f"Creating map of worst performing routes by {summary_kwargs['column']}"
+    )
 
     save_name = f"worst_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
         summary_gdf_geo=worst_geo_trips_per_1000_riders,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Creating map of best performing routes")
     best_geo = n_worst_best_routes(
-        summary_gdf_geo,
-        col="ratio",
-        percentile=False,
-        worst=False
+        summary_gdf_geo, col="ratio", percentile=False, worst=False
     )
 
-    summary_kwargs['legend_kwds'] = {
+    summary_kwargs["legend_kwds"] = {
         "caption": "Ratio of Actual Trips to Scheduled Trips"
     }
-    summary_kwargs['column'] = 'ratio'
+    summary_kwargs["column"] = "ratio"
 
     save_name = f"best_routes_{start_date}_to_{end_date}_{day_suffix}"
     plot_and_save(
-        summary_gdf_geo=best_geo,
-        summary_kwargs=summary_kwargs,
-        save_name=save_name
+        summary_gdf_geo=best_geo, summary_kwargs=summary_kwargs, save_name=save_name
     )
 
     best_geo_trips = n_worst_best_routes(
-        summary_gdf_geo,
-        col="avg_trip_count_rt",
-        worst=False,
-        percentile=False
+        summary_gdf_geo, col="avg_trip_count_rt", worst=False, percentile=False
     )
 
     summary_kwargs["legend_kwds"] = {"caption": "Daily average of actual trips"}
@@ -971,15 +872,12 @@ def make_all_maps(
     plot_and_save(
         summary_gdf_geo=best_geo_trips,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
     logger.info("Best geo trips per 1000 riders")
     best_geo_trips_per_1000_riders = n_worst_best_routes(
-        summary_gdf_geo,
-        col="trips_per_1000_riders",
-        worst=False,
-        percentile=False
+        summary_gdf_geo, col="trips_per_1000_riders", worst=False, percentile=False
     )
 
     summary_kwargs["legend_kwds"] = {
@@ -995,66 +893,58 @@ def make_all_maps(
     plot_and_save(
         summary_gdf_geo=best_geo_trips_per_1000_riders,
         summary_kwargs=summary_kwargs,
-        save_name=save_name
+        save_name=save_name,
     )
 
 
 def run_mvp() -> None:
-    """Reproduce maps and JSONs from MVP launch on 2022-11-11.
-    """
+    """Reproduce maps and JSONs from MVP launch on 2022-11-11."""
     logger.info("Creating GeoDataFrame")
     gdf = static_gtfs_analysis.main()
 
     logger.info(
-            "Loading data for MVP."
-            " Date range is between 2022-05-20 and 2022-11-05"
-        )
-    combined_long_df = pd.read_csv(
-        DATA_PATH / 'combined_long_df_2022-11-06.csv'
+        "Loading data for MVP." " Date range is between 2022-05-20 and 2022-11-05"
     )
-    combined_long_df.loc[:, 'date'] = pd.to_datetime(combined_long_df.loc[:, 'date'])
+    combined_long_df = pd.read_csv(DATA_PATH / "combined_long_df_2022-11-06.csv")
+    combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df.loc[:, "date"])
 
-    start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
-    end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
+    start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
+    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
 
-    summary_df = pd.read_csv(DATA_PATH / 'summary_df_2022-11-06.csv')
+    summary_df = pd.read_csv(DATA_PATH / "summary_df_2022-11-06.csv")
 
     # MVP is weekday only
     logger.info("Keeping only weekday data for MVP")
-    summary_df_wk = filter_day_type(summary_df, day_type='wk')
+    summary_df_wk = filter_day_type(summary_df, day_type="wk")
     summary_df_wk = calculate_percentile_and_rank(summary_df_wk, col="ratio")
 
     # Weekday only
     ridership_by_rte_date = fetch_ridership_data()
 
     ridership_by_rte_date_wk = ridership_by_rte_date.loc[
-        ridership_by_rte_date['daytype'] == 'W'
+        ridership_by_rte_date["daytype"] == "W"
     ]
-    combined_long_df_wk = combined_long_df.loc[
-        combined_long_df['day_type'] == 'wk'
-    ]
+    combined_long_df_wk = combined_long_df.loc[combined_long_df["day_type"] == "wk"]
 
-    ridership_end_date = ridership_by_rte_date['date'].max().strftime('%Y-%m-%d')
+    ridership_end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
 
     merged_df_wk = merge_ridership_combined(
         combined_long_df=combined_long_df_wk,
         ridership_df=ridership_by_rte_date_wk,
         start_date=start_date,
-        ridership_end_date=ridership_end_date
+        ridership_end_date=ridership_end_date,
     )
 
     daily_means = calculate_trips_per_rider(merged_df_wk)
 
-    summary_df_wk_mean = summary_df_wk.merge(daily_means, on='route_id')
+    summary_df_wk_mean = summary_df_wk.merge(daily_means, on="route_id")
 
     summary_df_wk_mean = calculate_percentile_and_rank(
-        summary_df_wk_mean,
-        col="avg_trip_count_rt"
+        summary_df_wk_mean, col="avg_trip_count_rt"
     )
 
     summary_df_wk_mean = calculate_percentile_and_rank(
-        summary_df_wk_mean,
-        col="trips_per_1000_riders"
+        summary_df_wk_mean, col="trips_per_1000_riders"
     )
 
     summary_gdf = summary_df_wk_mean.merge(gdf, how="right", on="route_id")
@@ -1062,21 +952,20 @@ def run_mvp() -> None:
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
     make_all_maps(
-        summary_gdf_geo=summary_gdf_geo,
-        start_date=start_date,
-        end_date=end_date
+        summary_gdf_geo=summary_gdf_geo, start_date=start_date, end_date=end_date
     )
 
     create_ridership_map(mvp=True)
 
     make_descriptive_plots(
-        combined_long_df=combined_long_df_wk,
-        summary_df=summary_df_wk_mean
+        combined_long_df=combined_long_df_wk, summary_df=summary_df_wk_mean
     )
+
+    make_ward_maps(summary_df_wk, start_date, end_date)
 
 
 def main(day_type: str = None) -> None:
-    """ Generate maps of all routes, top 10 best routes,
+    """Generate maps of all routes, top 10 best routes,
     top 10 worst routes, and ridership
 
     Args:
@@ -1087,7 +976,7 @@ def main(day_type: str = None) -> None:
 
     logger.info("Getting latest real-time and schedule comparison data")
 
-    combined_long_df, summary_df = compare_scheduled_and_rt.main(freq='D')
+    combined_long_df, summary_df = compare_scheduled_and_rt.main(freq="D")
 
     if day_type is not None:
         summary_df = filter_day_type(summary_df, day_type=day_type)
@@ -1095,57 +984,52 @@ def main(day_type: str = None) -> None:
     summary_df = calculate_percentile_and_rank(summary_df, col="ratio")
 
     route_daily_mean = (
-        combined_long_df
-        .groupby(['route_id'])['trip_count_rt'].mean().round(1)
+        combined_long_df.groupby(["route_id"])["trip_count_rt"]
+        .mean()
+        .round(1)
         .reset_index()
     )
 
     route_daily_mean.rename(
-        columns={"trip_count_rt": "avg_trip_count_rt"},
-        inplace=True
+        columns={"trip_count_rt": "avg_trip_count_rt"}, inplace=True
     )
 
-    summary_df_mean = summary_df.merge(route_daily_mean, on='route_id')
+    summary_df_mean = summary_df.merge(route_daily_mean, on="route_id")
 
     summary_df_mean = calculate_percentile_and_rank(
-        summary_df_mean,
-        col="avg_trip_count_rt"
+        summary_df_mean, col="avg_trip_count_rt"
     )
 
     summary_gdf = summary_df_mean.merge(gdf, how="right", on="route_id")
 
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
-    combined_long_df.loc[:, 'date'] = pd.to_datetime(
-        combined_long_df.loc[:, 'date']
-    )
+    combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df.loc[:, "date"])
 
-    start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
-    end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
+    start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
+    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
 
     ridership_by_rte_date = fetch_ridership_data()
 
-    ridership_end_date = ridership_by_rte_date['date'].max().strftime('%Y-%m-%d')
+    ridership_end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
 
     merged_df = merge_ridership_combined(
         combined_long_df=combined_long_df,
         ridership_df=ridership_by_rte_date,
         start_date=start_date,
-        ridership_end_date=ridership_end_date
+        ridership_end_date=ridership_end_date,
     )
 
     daily_means = calculate_trips_per_rider(merged_df)
 
-    summary_df_mean = summary_df.merge(daily_means, on='route_id')
+    summary_df_mean = summary_df.merge(daily_means, on="route_id")
 
     summary_df_mean = calculate_percentile_and_rank(
-        summary_df_mean,
-        col="avg_trip_count_rt"
+        summary_df_mean, col="avg_trip_count_rt"
     )
 
     summary_df_mean = calculate_percentile_and_rank(
-        summary_df_mean,
-        col="trips_per_1000_riders"
+        summary_df_mean, col="trips_per_1000_riders"
     )
 
     summary_gdf = summary_df_mean.merge(gdf, how="right", on="route_id")
@@ -1153,32 +1037,66 @@ def main(day_type: str = None) -> None:
     summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
 
     make_all_maps(
-        summary_gdf_geo=summary_gdf_geo,
-        start_date=start_date,
-        end_date=end_date
+        summary_gdf_geo=summary_gdf_geo, start_date=start_date, end_date=end_date
     )
 
     create_ridership_map()
 
-    make_descriptive_plots(
-        combined_long_df=combined_long_df,
-        summary_df=summary_df
-    )
+    make_descriptive_plots(combined_long_df=combined_long_df, summary_df=summary_df)
+
+    make_ward_maps(summary_df, start_date, end_date)
 
 
 def merge_ridership_combined(
     combined_long_df: pd.DataFrame,
     ridership_df: pd.DataFrame,
     start_date: str,
-        ridership_end_date: str) -> pd.DataFrame:
+    ridership_end_date: str,
+) -> pd.DataFrame:
     """Merge the combined_long_df and ridership data
 
     Args:
         combined_long_df (pd.DataFrame): The first element of the output from
             the compare_scheduled_and_rt.main or the saved csv file from
             the MVP in the data_output directory
+
+            Data columns (total 7 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   date              17370 non-null  object
+            1   route_id          17370 non-null  object
+            2   trip_count_rt     17370 non-null  int64
+            3   trip_count_sched  17370 non-null  int64
+            4   dayofweek         17370 non-null  int64
+            5   day_type          17370 non-null  object
+            6   feed_version      17370 non-null  int64
+
+            Example:
+            date        route_id  trip_count_rt  trip_count_sched  dayofweek day_type  feed_version
+        0  2022-05-20        1             43                59          4       wk      20220507
+        1  2022-05-20      100             33                53          4       wk      20220507
+        2  2022-05-20      103             80               132          4       wk      20220507
+        3  2022-05-20      106            121               134          4       wk      20220507
+        4  2022-05-20      108             34                71          4       wk      20220507
+
         ridership_df (pd.DataFrame): Ridership data taken from the
             fetch_ridership function
+                    Data columns (total 4 columns):
+        #   Column   Non-Null Count   Dtype
+        ---  ------   --------------   -----
+        0   route    963408 non-null  object
+        1   date     963408 non-null  datetime64[ns]
+        2   daytype  963408 non-null  object
+        3   rides    963408 non-null  int64
+
+        Example:
+            route       date      daytype   rides
+        0     3     2001-01-01       U      7354
+        1     4     2001-01-01       U      9288
+        2     6     2001-01-01       U      6048
+        3     8     2001-01-01       U      6309
+        4     9     2001-01-01       U      11207
+
         start_date (str): The beginning of data collection from
             combined_long_df
         ridership_end_date (str): The end of data collection from the
@@ -1190,13 +1108,12 @@ def merge_ridership_combined(
     """
 
     combined_long_df_rider = combined_long_df.loc[
-        (combined_long_df['date'] >= start_date)
-        &
-        (combined_long_df['date'] <= ridership_end_date)
+        (combined_long_df["date"] >= start_date)
+        & (combined_long_df["date"] <= ridership_end_date)
     ]
     ridership_df = ridership_df.loc[
-        (ridership_df['date'] >= start_date)
-        & (ridership_df['date'] <= ridership_end_date)
+        (ridership_df["date"] >= start_date)
+        & (ridership_df["date"] <= ridership_end_date)
     ]
 
     return ridership_df.merge(
@@ -1207,8 +1124,8 @@ def merge_ridership_combined(
 
 
 def make_descriptive_plots(
-    combined_long_df: pd.DataFrame,
-        summary_df: pd.DataFrame) -> None:
+    combined_long_df: pd.DataFrame, summary_df: pd.DataFrame
+) -> None:
     """Plot linecharts, boxplots, scatterplots, etc. of the trip ratio
 
     Args:
@@ -1216,33 +1133,43 @@ def make_descriptive_plots(
             and scheduled trips per route per day
         summary_df (pd.DataFrame): A DataFrame of actual trips and scheduled
             trips per route
+                    Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   route_id          424 non-null    object
+        1   day_type          424 non-null    object
+        2   trip_count_rt     424 non-null    int64
+        3   trip_count_sched  424 non-null    int64
+        4   ratio             424 non-null    float64
+
+        Example:
+            route_id day_type  trip_count_rt  trip_count_sched  ratio
+        0        1      hol             47                59  0.796610
+        1        1       wk           4978              6112  0.814463
+        2      100      hol             38                53  0.716981
+        3      100       wk           4766              5560  0.857194
+        4      103      hol            303               342  0.885965
     """
     combined_long_df = combined_long_df.copy()
 
-    combined_long_df.loc[:, 'date'] = pd.to_datetime(
-        combined_long_df.loc[:, 'date']
-    )
+    combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df.loc[:, "date"])
 
-    start_date = combined_long_df['date'].min().strftime('%Y-%m-%d')
-    end_date = combined_long_df['date'].max().strftime('%Y-%m-%d')
+    start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
+    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
 
     combined_long_df.loc[:, "ratio"] = (
-        combined_long_df.loc[:, "trip_count_rt"] / combined_long_df.loc[:, "trip_count_sched"]
+        combined_long_df.loc[:, "trip_count_rt"]
+        / combined_long_df.loc[:, "trip_count_sched"]
     )
 
-    combined_long_groupby_date = groupby_long_df(
-        combined_long_df,
-        'date'
-    )
+    combined_long_groupby_date = groupby_long_df(combined_long_df, "date")
 
     combined_long_groupby_day_type = groupby_long_df(
-        combined_long_df,
-        ['date', 'day_type']
+        combined_long_df, ["date", "day_type"]
     )
 
     logger.info(
-        f"Result of the ADF test is"
-        f" {adfuller(combined_long_groupby_date['ratio'])}"
+        f"Result of the ADF test is" f" {adfuller(combined_long_groupby_date['ratio'])}"
     )
     # p-value is 0.95 > 0.05. Fail to reject the null of non-stationarity.
     logger.info(
@@ -1256,13 +1183,13 @@ def make_descriptive_plots(
     logger.info("Creating lineplot with moving median")
     lineplot(
         data=combined_long_groupby_date,
-        x='date',
-        y='ratio',
-        xlabel='Date',
-        ylabel='Ratio of actual trips to scheduled trips',
+        x="date",
+        y="ratio",
+        xlabel="Date",
+        ylabel="Ratio of actual trips to scheduled trips",
         rolling_median=True,
-        title=f'Trip ratios<br>{start_date} to {end_date}',
-        save_name="lineplot_of_ratio_over_time_w_rolling_median"
+        title=f"Trip ratios<br>{start_date} to {end_date}",
+        save_name="lineplot_of_ratio_over_time_w_rolling_median",
     )
 
     logger.info("Creating line plot by day type")
@@ -1274,7 +1201,7 @@ def make_descriptive_plots(
         ylabel="Ratio of actual trips to scheduled trips",
         color_var="day_type",
         title=f"Trip ratios by Day Type<br>{start_date} to {end_date}",
-        save_name="lineplot_of_ratio_over_time_by_day_type"
+        save_name="lineplot_of_ratio_over_time_by_day_type",
     )
 
     logger.info("Creating box plot by day type")
@@ -1284,32 +1211,30 @@ def make_descriptive_plots(
         data=summary_df,
         xlabel="Day Type",
         ylabel="Ratio of actual trips to scheduled trips",
-        title=f"Trip ratio distribution by Day Type<br>"
-              f"{start_date} to {end_date}"
+        title=f"Trip ratio distribution by Day Type<br>" f"{start_date} to {end_date}",
     )
 
     ridership_by_rte_date = fetch_ridership_data()
-    ridership_end_date = ridership_by_rte_date['date'].max().strftime('%Y-%m-%d')
+    ridership_end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
 
     ridership_by_rte_date_wk = ridership_by_rte_date.loc[
-        ridership_by_rte_date['daytype'] == 'W'
+        ridership_by_rte_date["daytype"] == "W"
     ]
 
-    combined_long_df_wk = combined_long_df.loc[
-        combined_long_df['day_type'] == 'wk'
-    ]
+    combined_long_df_wk = combined_long_df.loc[combined_long_df["day_type"] == "wk"]
 
     merged_df_wk = merge_ridership_combined(
         combined_long_df=combined_long_df_wk,
         ridership_df=ridership_by_rte_date_wk,
         start_date=start_date,
-        ridership_end_date=ridership_end_date)
+        ridership_end_date=ridership_end_date,
+    )
 
     merged_df = merge_ridership_combined(
         combined_long_df=combined_long_df,
         ridership_df=ridership_by_rte_date,
         start_date=start_date,
-        ridership_end_date=ridership_end_date
+        ridership_end_date=ridership_end_date,
     )
 
     logger.info("Scatterplot of trip ratio by ridership for weekdays")
@@ -1318,13 +1243,13 @@ def make_descriptive_plots(
         x="rides",
         y="ratio",
         title=f"Scatterplot of ratio by rides<br>"
-              f"{start_date} to {ridership_end_date}",
+        f"{start_date} to {ridership_end_date}",
         xlabel="Ridership",
         ylabel="Ratio of actual trips to scheduled trips",
         trendline="ols",
         trendline_color_override="red",
         save_name=f"scatterplot_of_ratio_by_ridership_"
-                  f"{start_date}_to_{ridership_end_date}_wk"
+        f"{start_date}_to_{ridership_end_date}_wk",
     )
 
     logger.info("Scatterplot of trip ratio by ridership for all day types")
@@ -1334,12 +1259,273 @@ def make_descriptive_plots(
         y="ratio",
         facet_col="day_type",
         title=f"Scatterplot of ratio by rides<br>"
-              f"{start_date} to {ridership_end_date}",
+        f"{start_date} to {ridership_end_date}",
         xlabel="Ridership",
         ylabel="Ratio of actual trips to scheduled trips",
         trendline="ols",
         trendline_color_override="red",
         save_name=f"scatterplot_of_ratio_by_ridership_"
-                  f"{start_date}_to_{ridership_end_date}"
-                  f"_all_day_types"
+        f"{start_date}_to_{ridership_end_date}"
+        f"_all_day_types",
     )
+
+
+def calculate_ratio_per_ward(
+    ward_df: pd.DataFrame, summary_df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Args:
+        ward_df (pd.DataFrame): DataFrame containing all routes
+            passing through a ward.
+
+            Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   ward              50 non-null     int64
+        1   trip_count_rt     50 non-null     int64
+        2   trip_count_sched  50 non-null     int64
+        3   ratio             50 non-null     float64
+        4   routes            50 non-null     object
+        The columns of interest are ward and routes.
+
+        Example:
+                ward   routes
+        0     1  [49, 50, 56, 65, 66, 70, 72, 73, 74, 76, 9, 94...
+        1     2  [120, 121, 124, 125, 134, 135, 136, 143, 146, ...
+        2     3  [1, 12, 146, 15, 18, 192, 2, 21, 24, 26, 29, 3...
+        3     4  [1, 12, 126, 143, 146, 147, 148, 15, 172, 18, ...
+        4     5  [15, 171, 172, 192, 2, 26, 28, 30, 4, 5, 55, 5...
+
+        summary_df (pd.DataFrame): DataFrame containing trip ratio per route
+
+                Data columns (total 5 columns):
+        #   Column            Non-Null Count  Dtype
+        ---  ------            --------------  -----
+        0   route_id          424 non-null    object
+        1   day_type          424 non-null    object
+        2   trip_count_rt     424 non-null    int64
+        3   trip_count_sched  424 non-null    int64
+        4   ratio             424 non-null    float64
+
+        Example:
+            route_id day_type  trip_count_rt  trip_count_sched  ratio
+        0        1      hol             47                59  0.796610
+        1        1       wk           4978              6112  0.814463
+        2      100      hol             38                53  0.716981
+        3      100       wk           4766              5560  0.857194
+        4      103      hol            303               342  0.885965
+
+    Returns:
+        pd.DataFrame: DataFrame containing median and weighted median
+            trip ratio of all routes per ward
+    """
+    # Deal with list values in 'routes' column
+    df_explode = ward_df.explode("routes").reset_index(drop=True)
+    df_explode = df_explode.drop(columns=["trip_count_rt", "trip_count_sched", "ratio"])
+    merged_df = summary_df.merge(df_explode, left_on="route_id", right_on="routes")
+    freq_df = (
+        merged_df["route_id"]
+        .value_counts()
+        .reset_index()
+        .rename(columns={"index": "route_id", "route_id": "routes_per_ward"})
+    )
+    merged_df = merged_df.merge(freq_df, on="route_id")
+    # routes_per_ward is the number of routes passing through a particular ward
+    # Example
+    #         ward  routes_per_ward
+    # 1890    37     32
+    # 2562    27     64
+    # 1068    14     36
+    # 1732    37     32
+    # 2550    36     64
+    merged_df["weights"] = 1 / merged_df["routes_per_ward"]
+    medians = merged_df.groupby("ward").agg(median=("ratio", "median"))
+    weighted_medians = merged_df.groupby("ward").apply(
+        weighted_median, "ratio", "weights"
+    )
+
+    medians = medians.reset_index()
+    weighted_medians = weighted_medians.reset_index().rename(
+        columns={0: "weighted_median"}
+    )
+    medians_merge_df = medians.merge(weighted_medians, on="ward")
+    return medians_merge_df
+
+
+def weighted_median(df: pd.DataFrame, col: str, weights: List[float]) -> float:
+    """Compute the weighted median
+
+    Args:
+        df (pd.DataFrame): The DataFrame to apply the weighted median function to
+        col (str): The column to compute the weighted median on
+        weights (List[float]): Weights for the specified column
+
+    Returns:
+        List[float]: the weighted median of col according to weights
+    """
+    return weightedstats.weighted_median(df[col], df[weights])
+
+
+def create_ward_map(
+    ward_df: pd.DataFrame, start_date: str, end_date: str, day_type_suffix: str
+) -> None:
+    """Create a map of wards colored by median trip ratio of routes passing
+        through a ward
+
+    Args:
+        ward_df (pd.DataFrame): A DataFrame containing routes
+            passing through a ward
+                    Data columns (total 5 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   ward              50 non-null     int64
+            1   trip_count_rt     50 non-null     int64
+            2   trip_count_sched  50 non-null     int64
+            3   ratio             50 non-null     float64
+            4   routes            50 non-null     object
+            The columns of interest are ward and routes.
+
+            Example:
+                    ward   routes
+            0     1  [49, 50, 56, 65, 66, 70, 72, 73, 74, 76, 9, 94...
+            1     2  [120, 121, 124, 125, 134, 135, 136, 143, 146, ...
+            2     3  [1, 12, 146, 15, 18, 192, 2, 21, 24, 26, 29, 3...
+            3     4  [1, 12, 126, 143, 146, 147, 148, 15, 172, 18, ...
+            4     5  [15, 171, 172, 192, 2, 26, 28, 30, 4, 5, 55, 5...
+        start_date (str): The start of the data series
+        end_date (str): The end of the data series
+        day_type_suffix (str): The type of day of the data.
+            Will be one of wk, hol, sat, or sun
+    """
+    ward_boundaries_df = gpd.read_file(DATA_PATH / "chicagoWards2023.geojson")
+    ward_boundaries_df["ward"] = ward_boundaries_df["ward"].astype(int)
+    ward_boundaries_df["edit_date"] = ward_boundaries_df["edit_date"].astype(str)
+    merged_ward_boundaries = ward_df.merge(ward_boundaries_df, on="ward")
+    summary_kwargs = {
+        "cmap": "plasma",
+        "column": "median",
+        "legend_kwds": {
+            "caption": "Median ratio of Actual Trips to Scheduled Trips",
+            "max_labels": 5,
+        },
+        "legend": True,
+    }
+
+    merged_ward_boundaries_gdf = gpd.GeoDataFrame(merged_ward_boundaries)
+    logger.info(f"Making ward map of {summary_kwargs['column']} trip ratios")
+    ward_map = merged_ward_boundaries_gdf.explore(**summary_kwargs)
+    save_path = create_save_path(
+        f"ward_map_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs['column']}"
+    )
+    ward_map.save(f"{save_path}.html")
+
+    summary_kwargs["column"] = "weighted_median"
+    summary_kwargs["legend_kwds"] = {
+        "caption": "Weighted median of Ratio of Actual Trips to Scheduled Trips",
+        "max_labels": 5,
+    }
+
+    logger.info(f"Making ward map of {summary_kwargs['column']} trip ratios")
+    ward_map_weighted = merged_ward_boundaries_gdf.explore(**summary_kwargs)
+    save_path = create_save_path(
+        f"ward_map_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs['column']}"
+    )
+    ward_map_weighted.save(f"{save_path}.html")
+
+    # Quantile maps
+    bounds = legend_formatter(merged_ward_boundaries_gdf, "median", decimals="2f")
+
+    summary_kwargs_quantiles = {
+        "cmap": "plasma",
+        "column": "median",
+        "scheme": "Quantiles",
+        "legend_kwds": {
+            "caption": "Median of Ratio of Actual Trips to Scheduled Trips",
+            "colorbar": False,
+            "labels": bounds,
+        },
+        "legend": True,
+        "categorical": False,
+        "k": 5,
+    }
+
+    logger.info(
+        f"Making quantile ward map of {summary_kwargs_quantiles['column']} trip ratios"
+    )
+    ward_map_quantiles = merged_ward_boundaries_gdf.explore(**summary_kwargs_quantiles)
+    save_path = create_save_path(
+        f"ward_map_quantiles_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs_quantiles['column']}"
+    )
+    ward_map_quantiles.save(f"{save_path}.html")
+
+    bounds_weighted = legend_formatter(
+        merged_ward_boundaries_gdf, var="weighted_median", decimals="2f"
+    )
+
+    summary_kwargs_quantiles["column"] = "weighted_median"
+    summary_kwargs_quantiles["legend_kwds"] = {
+        "caption": "Weighted Median of Ratio of Actual Trips to Scheduled Trips",
+        "colorbar": False,
+        "labels": bounds_weighted,
+    }
+
+    logger.info(
+        f"Making quantile ward map of {summary_kwargs_quantiles['column']} trip ratios"
+    )
+    ward_map_quantiles_weighted = merged_ward_boundaries_gdf.explore(
+        **summary_kwargs_quantiles
+    )
+    save_path = create_save_path(
+        f"ward_map_quantiles_{start_date}_to_{end_date}_{day_type_suffix}_{summary_kwargs_quantiles['column']}"
+    )
+    ward_map_quantiles_weighted.save(f"{save_path}.html")
+
+    logger.info("saving JSON and HTML table")
+    path_name = create_save_path(
+        f"ward_rankings_{start_date}_to_{end_date}_{day_type_suffix}", DATA_PATH
+    )
+
+    # Convert list to string in GeoDataFrame before saving
+    merged_ward_boundaries_gdf["routes"] = merged_ward_boundaries_gdf["routes"].apply(
+        lambda x: " ".join(x)
+    )
+    merged_ward_boundaries_gdf.to_file(f"{path_name}.json", driver="GeoJSON")
+    merged_ward_boundaries_gdf.to_html(f"{path_name}_table.html", index=False)
+
+
+def make_ward_maps(summary_df: pd.DataFrame, start_date: str, end_date: str) -> None:
+    """Prepare data for ward maps and plot them
+
+    Args:
+        summary_df (pd.DataFrame): DataFrame containing trip ratio for each
+            route
+                Data columns (total 5 columns):
+            #   Column            Non-Null Count  Dtype
+            ---  ------            --------------  -----
+            0   route_id          424 non-null    object
+            1   day_type          424 non-null    object
+            2   trip_count_rt     424 non-null    int64
+            3   trip_count_sched  424 non-null    int64
+            4   ratio             424 non-null    float64
+
+            Example:
+                route_id day_type  trip_count_rt  trip_count_sched  ratio
+            0        1      hol             47                59  0.796610
+            1        1       wk           4978              6112  0.814463
+            2      100      hol             38                53  0.716981
+            3      100       wk           4766              5560  0.857194
+            4      103      hol            303               342  0.885965
+
+        start_date (str): The start of the data series
+        end_date (str): The end of the date series
+    """
+    ward_df = pd.read_json(DATA_PATH / "wardBusRouteMappings.json")
+    medians_ward_df = calculate_ratio_per_ward(ward_df, summary_df)
+    day_type_suffix = set_day_type_suffix(summary_df)
+    # Keep the entire list of routes per ward
+    medians_ward_df = medians_ward_df.merge(ward_df[["ward", "routes"]], on="ward")
+    median_ward_df_rank = calculate_percentile_and_rank(medians_ward_df, "median")
+    weighted_median_ward_df_rank = calculate_percentile_and_rank(
+        median_ward_df_rank, "weighted_median"
+    )
+    create_ward_map(weighted_median_ward_df_rank, start_date, end_date, day_type_suffix)

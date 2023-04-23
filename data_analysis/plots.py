@@ -15,10 +15,12 @@ import geopandas as gpd
 import mapclassify
 import numpy as np
 import pandas as pd
+import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 import weightedstats
 from branca.colormap import LinearColormap
+from chart_studio.exceptions import PlotlyRequestError
 from statsmodels.tsa.stattools import adfuller, kpss
 
 import data_analysis.compare_scheduled_and_rt as compare_scheduled_and_rt
@@ -145,6 +147,7 @@ def lineplot(
     save: bool = True,
     save_name: str = None,
     rolling_median: bool = False,
+    chart_studio: bool = False,
 ) -> None:
     """Plot a line plot using Plotly
 
@@ -225,8 +228,15 @@ def lineplot(
         logger.info(f"Saving to {save_path}")
         fig.write_html(f"{save_path}.html")
         fig.write_image(f"{save_path}.png")
-        logger.info("Saving to Chart Studio")
-        py.plot(fig, filename=f"{save_name}", auto_open=False)
+        if chart_studio:
+            logger.info("Saving to Chart Studio")
+            try:
+                py.plot(fig, filename=f"{save_name}", auto_open=False)
+            except PlotlyRequestError:
+                logger.info(f"{save_path} too big for Chart Studio. Saving locally.")
+                plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
+        else:
+            plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
 
 
 def scatterplot(
@@ -237,6 +247,7 @@ def scatterplot(
     show: bool = False,
     save: bool = True,
     save_name: str = None,
+    chart_studio: bool = False,
     **kwargs: dict,
 ) -> None:
     """Scatter plot with OLS trendline
@@ -268,8 +279,15 @@ def scatterplot(
         logger.info(f"Saving to {save_path}")
         fig.write_html(f"{save_path}.html")
         fig.write_image(f"{save_path}.png")
-        logger.info("Saving to Chart Studio")
-        py.plot(fig, filename=f"{save_name}", auto_open=False)
+        if chart_studio:
+            logger.info("Saving to Chart Studio")
+            try:
+                py.plot(fig, filename=f"{save_name}", auto_open=False)
+            except PlotlyRequestError:
+                logger.info(f"{save_path} too big for Chart Studio. Saving locally.")
+                plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
+        else:
+            plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
 
 
 def boxplot(
@@ -282,6 +300,7 @@ def boxplot(
     title: str = None,
     save: bool = True,
     save_name: str = None,
+    chart_studio: bool = False,
 ) -> None:
     """Make a boxplot and save the figure
 
@@ -316,8 +335,15 @@ def boxplot(
         logger.info(f"Saving to {save_path}")
         fig.write_html(f"{save_path}.html")
         fig.write_image(f"{save_path}.png")
-        logger.info("Saving to Chart Studio")
-        py.plot(fig, filename=f"{save_name}", auto_open=False)
+        if chart_studio:
+            logger.info("Saving to Chart Studio")
+            try:
+                py.plot(fig, filename=f"{save_name}", auto_open=False)
+            except PlotlyRequestError:
+                logger.info(f"{save_path} too big for Chart Studio. Saving locally.")
+                plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
+        else:
+            plotly.offline.plot(fig, filename=f"{save_path}", auto_open=False)
 
 
 def plot_map(
@@ -913,6 +939,10 @@ def run_mvp() -> None:
 
     summary_df = pd.read_csv(DATA_PATH / "summary_df_2022-11-06.csv")
 
+    # Remove Fullerton bus route 74
+    combined_long_df = combined_long_df.loc[combined_long_df["route_id"] != "74"]
+    summary_df = summary_df.loc[summary_df["route_id"] != "74"]
+
     # MVP is weekday only
     logger.info("Keeping only weekday data for MVP")
     summary_df_wk = filter_day_type(summary_df, day_type="wk")
@@ -976,7 +1006,19 @@ def main(day_type: str = None) -> None:
 
     logger.info("Getting latest real-time and schedule comparison data")
 
+    # combined_long_df = pd.read_csv(DATA_PATH / 'combined_long_df_2023-03-01.csv')
+    # combined_long_df.drop(columns='Unnamed: 0', inplace=True)
+    # summary_df = pd.read_csv(DATA_PATH / 'summary_df_2023_03_01.csv')
+    # summary_df.drop(columns='Unnamed: 0', inplace=True)
+
     combined_long_df, summary_df = compare_scheduled_and_rt.main(freq="D")
+    today = datetime.now().strftime("%Y-%m-%d")
+    combined_long_df.to_csv(DATA_PATH / f"combined_long_df_{today}.csv", index=False)
+    summary_df.to_csv(DATA_PATH / f"summary_df_{today}.csv", index=False)
+    # Remove 74 Fullerton bus from data
+    combined_long_df = combined_long_df.loc[combined_long_df["route_id"] != "74"]
+    summary_df = summary_df.loc[summary_df["route_id"] != "74"]
+    gdf = gdf.loc[gdf.route_id != "74"]
 
     if day_type is not None:
         summary_df = filter_day_type(summary_df, day_type=day_type)
@@ -1115,6 +1157,10 @@ def merge_ridership_combined(
         (ridership_df["date"] >= start_date)
         & (ridership_df["date"] <= ridership_end_date)
     ]
+    combined_long_df_rider.loc[:, "date"] = pd.to_datetime(
+        combined_long_df_rider.loc[:, "date"]
+    )
+    ridership_df.loc[:, "date"] = pd.to_datetime(ridership_df.loc[:, "date"])
 
     return ridership_df.merge(
         combined_long_df_rider,
@@ -1124,7 +1170,7 @@ def merge_ridership_combined(
 
 
 def make_descriptive_plots(
-    combined_long_df: pd.DataFrame, summary_df: pd.DataFrame
+    combined_long_df: pd.DataFrame, summary_df: pd.DataFrame, chart_studio: bool = False
 ) -> None:
     """Plot linecharts, boxplots, scatterplots, etc. of the trip ratio
 
@@ -1190,6 +1236,7 @@ def make_descriptive_plots(
         rolling_median=True,
         title=f"Trip ratios<br>{start_date} to {end_date}",
         save_name="lineplot_of_ratio_over_time_w_rolling_median",
+        chart_studio=chart_studio,
     )
 
     logger.info("Creating line plot by day type")
@@ -1202,6 +1249,7 @@ def make_descriptive_plots(
         color_var="day_type",
         title=f"Trip ratios by Day Type<br>{start_date} to {end_date}",
         save_name="lineplot_of_ratio_over_time_by_day_type",
+        chart_studio=chart_studio,
     )
 
     logger.info("Creating box plot by day type")
@@ -1212,6 +1260,49 @@ def make_descriptive_plots(
         xlabel="Day Type",
         ylabel="Ratio of actual trips to scheduled trips",
         title=f"Trip ratio distribution by Day Type<br>" f"{start_date} to {end_date}",
+        chart_studio=chart_studio,
+    )
+
+    combined_long_df_wk = combined_long_df.loc[combined_long_df["day_type"] == "wk"]
+
+    for route, df in combined_long_df_wk.groupby("route_id"):
+        lineplot(
+            data=df,
+            x="date",
+            y="ratio",
+            xlabel="Date",
+            ylabel="Ratio of actual trips to scheduled trips",
+            rolling_median=True,
+            title=f"Trip ratios<br>{start_date} to {end_date}<br>Route {route}",
+            save_name=f"bus_routes/lineplot_of_ratio_over_time_w_rolling_median_route_{route}",
+            chart_studio=chart_studio,
+        )
+
+    for route, df in combined_long_df.groupby("route_id"):
+        lineplot(
+            data=df,
+            x="date",
+            y="ratio",
+            xlabel="Date",
+            ylabel="Ratio of actual trips to scheduled trips",
+            color_var="day_type",
+            title=f"Trip ratios by Day Type<br>{start_date} to {end_date}<br>Route {route}",
+            save_name=f"bus_routes/lineplot_of_ratio_over_time_by_day_type_route_{route}",
+            chart_studio=chart_studio,
+        )
+
+    # Save JSON data
+    logger.info("Saving JSON data")
+    # Prevent to_dict from converting date to a datetime
+    combined_long_df["date"] = combined_long_df["date"].astype(str)
+    out = combined_long_df.groupby("route_id")[["date", "ratio"]].apply(
+        lambda x: x.to_dict(orient="records")
+    )
+    save_path = create_save_path(
+        f"bus_performance_by_route_{start_date}_to_{end_date}", DATA_PATH
+    )
+    out.reset_index().rename(columns={0: "data"}).to_json(
+        f"{save_path}.json", orient="records", date_format="iso"
     )
 
     ridership_by_rte_date = fetch_ridership_data()
@@ -1220,8 +1311,6 @@ def make_descriptive_plots(
     ridership_by_rte_date_wk = ridership_by_rte_date.loc[
         ridership_by_rte_date["daytype"] == "W"
     ]
-
-    combined_long_df_wk = combined_long_df.loc[combined_long_df["day_type"] == "wk"]
 
     merged_df_wk = merge_ridership_combined(
         combined_long_df=combined_long_df_wk,
@@ -1250,6 +1339,7 @@ def make_descriptive_plots(
         trendline_color_override="red",
         save_name=f"scatterplot_of_ratio_by_ridership_"
         f"{start_date}_to_{ridership_end_date}_wk",
+        chart_studio=chart_studio,
     )
 
     logger.info("Scatterplot of trip ratio by ridership for all day types")
@@ -1267,6 +1357,7 @@ def make_descriptive_plots(
         save_name=f"scatterplot_of_ratio_by_ridership_"
         f"{start_date}_to_{ridership_end_date}"
         f"_all_day_types",
+        chart_studio=chart_studio,
     )
 
 
@@ -1322,6 +1413,7 @@ def calculate_ratio_per_ward(
     # Deal with list values in 'routes' column
     df_explode = ward_df.explode("routes").reset_index(drop=True)
     df_explode = df_explode.drop(columns=["trip_count_rt", "trip_count_sched", "ratio"])
+
     merged_df = summary_df.merge(df_explode, left_on="route_id", right_on="routes")
     freq_df = (
         merged_df["route_id"]
@@ -1520,6 +1612,12 @@ def make_ward_maps(summary_df: pd.DataFrame, start_date: str, end_date: str) -> 
         end_date (str): The end of the date series
     """
     ward_df = pd.read_json(DATA_PATH / "wardBusRouteMappings.json")
+    # Remove the 74 Fullteron bus
+    route_list = []
+    for sublist in ward_df.routes.values.tolist():
+        route_list.append([elt for elt in sublist if elt != "74"])
+    ward_df["routes"] = route_list
+
     medians_ward_df = calculate_ratio_per_ward(ward_df, summary_df)
     day_type_suffix = set_day_type_suffix(summary_df)
     # Keep the entire list of routes per ward

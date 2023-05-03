@@ -1,13 +1,16 @@
 name: Automated job
 
 on:
+  push:
+    branches:
+      - 'main'
   schedule:
-    - cron:  '28 * * * *'
+    - cron:  '*/5 * * * *'
 
 
 
 jobs:
-  Run script:
+  Run-script:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,4 +21,12 @@ jobs:
           python-version: '3.10'
 
       - name: Run a one-line script
-        run: python test_script.py
+        run: |
+          python test_script.py
+          touch test_file.txt
+          git config --global user.email "kyle.dolezal@gmail.com"
+          git config --global user.name "Kyle Dolezal"
+          git add .
+          git commit -m 'commit file'
+          git push origin HEAD
+        

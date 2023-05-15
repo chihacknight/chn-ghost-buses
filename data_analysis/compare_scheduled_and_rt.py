@@ -242,7 +242,7 @@ def combine_real_time_rt_comparison(
                 )
             except (botocore.exceptions.ConnectTimeoutError, botocore.exceptions.EndpointConnectionError):
                 daily_data = pd.read_csv(
-                    f'https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/{date_str}.csv',
+                    f'https://{BUCKET_PUBLIC}.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/{date_str}.csv',
                     low_memory=False
                 )
 

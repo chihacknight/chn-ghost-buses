@@ -1,4 +1,5 @@
 import os
+
 from dataclasses import dataclass, field
 from typing import List, Tuple
 import logging
@@ -10,6 +11,7 @@ import pandas as pd
 import pendulum
 from tqdm import tqdm
 from dotenv import load_dotenv
+import botocore
 
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
 from scrape_data.scrape_schedule_versions import create_schedule_list
@@ -232,11 +234,17 @@ def combine_real_time_rt_comparison(
 
             # Use low_memory option to avoid warning about columns
             # with mixed dtypes.
-            daily_data = pd.read_csv(
-                (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
-                .as_uri(),
-                low_memory=False
-            )
+            try:
+                daily_data = pd.read_csv(
+                    (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
+                    .as_uri(),
+                    low_memory=False
+                )
+            except (botocore.exceptions.ConnectTimeoutError, botocore.exceptions.EndpointConnectionError):
+                daily_data = pd.read_csv(
+                    f'https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/{date_str}.csv',
+                    low_memory=False
+                )
 
             daily_data = make_daily_summary(daily_data)
 

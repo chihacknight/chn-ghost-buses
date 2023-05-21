@@ -10,6 +10,8 @@ client = boto3.client(
     aws_secret_access_key=SECRET_KEY
 )
 
+client.upload_file("test_file.txt", 'chn-ghost-buses-public', "est_file.txt")
+
 print(client.list_objects_v2(
     Bucket='chn-ghost-buses-public'
 ))

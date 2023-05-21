@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - 'test_cronjob'
-  schedule:
-    - cron:  '5 4 * * *'
+#  schedule:
+#    - cron:  '5 4 * * *'
 
 
 

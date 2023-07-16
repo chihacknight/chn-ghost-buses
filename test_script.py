@@ -10,6 +10,11 @@ client = boto3.client(
     aws_secret_access_key=SECRET_KEY
 )
 
+result = client.get_acl()
+print("Printing acl:")
+print(result)
+
+print("Printing bucket objects:")
 print(client.list_objects_v2(
     Bucket='chn-ghost-buses-public'
 ))

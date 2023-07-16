@@ -15,4 +15,11 @@ print(client.list_objects_v2(
     Bucket='chn-ghost-buses-public'
 ))
 
-client.put_object(Body="test_file.txt", Bucket='chn-ghost-buses-public', Key=SECRET_KEY)
+s3 = boto3.resource(
+    's3',
+    region_name='us-east-1',
+    aws_access_key_id=ACCESS_KEY,
+    aws_secret_access_key=SECRET_KEY
+)
+content="String content to write to a new S3 file"
+s3.Object('chn-ghost-buses-public', 'newfile.txt').put(Body=content)

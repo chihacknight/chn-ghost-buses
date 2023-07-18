@@ -1,7 +1,8 @@
 name: Automated job
 
-on: [push, workflow_dispatch]
-  branches:
+on:
+  push:
+    branches:
     - 'automate-schedule-downloads'
 
 

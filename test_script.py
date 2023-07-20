@@ -6,8 +6,10 @@ SECRET_KEY = sys.argv[2]
 
 client = boto3.client(
     's3',
-    aws_access_key_id=ACCESS_KEY,
-    aws_secret_access_key=SECRET_KEY
+    # aws_access_key_id=ACCESS_KEY,
+    # aws_secret_access_key=SECRET_KEY
+    aws_access_key_id = "asdfdafsafds",
+    aws_secret_access_key = "asfdafds"
 )
 
 print("Printing bucket objects:")

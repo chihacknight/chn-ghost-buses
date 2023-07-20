@@ -15,6 +15,9 @@ print(client.list_objects_v2(
     Bucket='chn-ghost-buses-public'
 ))
 
+print("The user is:")
+print(client.get_caller_identity().get('Account'))
+
 s3 = boto3.resource(
     's3',
     region_name='us-east-1',

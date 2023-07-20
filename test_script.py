@@ -5,7 +5,7 @@ ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
 
 iam_client = boto3.client(
-    'IAM',
+    'iam',
     aws_access_key_id=ACCESS_KEY,
     aws_secret_access_key=SECRET_KEY
 )

@@ -12,11 +12,9 @@ client = boto3.client(
 
 print("Printing bucket objects:")
 print(client.list_objects_v2(
-    Bucket='chn-ghost-buses-public'
+    Bucket='chn-ghost-buses-public',
+    Prefix='bus_full_day_data_v2/'
 ))
-
-print("The user is:")
-print(client.get_caller_identity().get('Account'))
 
 s3 = boto3.resource(
     's3',

@@ -20,13 +20,22 @@ s3 = boto3.resource(
     aws_secret_access_key=SECRET_KEY
 )
 
+date = pendulum.now().to_date_string()
+
+zipfile = sga.download_cta_zip()
+print(f'Saving zipfile available at '
+      f'https://www.transitchicago.com/downloads/sch_data/google_transit.zip '
+      f'on {date} to public bucket')
+
+s3.Object('chn-ghost-buses-public', f'google_transit_{date}.zip')\
+     .put(Body=zipfile)
+
 data = sga.download_extract_format()
 trip_summary = sga.make_trip_summary(data)
 
 route_daily_summary = (
     sga.summarize_date_rt(trip_summary)
 )
-date = pendulum.now().to_date_string()
 
 csv_buffer = StringIO()
 route_daily_summary.to_csv(csv_buffer)
@@ -34,4 +43,3 @@ route_daily_summary.to_csv(csv_buffer)
 print(f'Saving cta_route_daily_summary_{date}.csv to public bucket')
 s3.Object('chn-ghost-buses-public', f'cta_route_daily_summary_{date}.csv')\
     .put(Body=csv_buffer.getvalue())
-

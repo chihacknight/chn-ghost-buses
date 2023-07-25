@@ -31,6 +31,7 @@ date = pendulum.now().to_date_string()
 csv_buffer = StringIO()
 route_daily_summary.to_csv(csv_buffer)
 
+print(f'Saving cta_route_daily_summary_{date}.csv to public bucket')
 s3.Object('chn-ghost-buses-public', f'cta_route_daily_summary_{date}.csv')\
     .put(Body=csv_buffer.getvalue())
 

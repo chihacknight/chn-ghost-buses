@@ -22,13 +22,12 @@ s3 = boto3.resource(
 
 date = pendulum.now().to_date_string()
 
-zipfile = sga.download_cta_zip()
+zipfile, zipfile_bytes_io = sga.download_cta_zip()
 print(f'Saving zipfile available at '
       f'https://www.transitchicago.com/downloads/sch_data/google_transit.zip '
       f'on {date} to public bucket')
-
-s3.Object('chn-ghost-buses-public', f'google_transit_{date}.zip')\
-     .put(Body=zipfile)
+zipfile_bytes_io.seek(0)
+client.upload_fileobj(zipfile_bytes_io, 'chn-ghost-buses-public', f'google_transit_{date}.zip')
 
 data = sga.download_extract_format()
 trip_summary = sga.make_trip_summary(data)

@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List
+from typing import Tuple
 
 import logging
 import calendar
@@ -331,21 +331,20 @@ def make_linestring_of_points(
     return shapely.geometry.LineString(list(sorted_df["pt"]))
 
 
-def download_cta_zip() -> zipfile.ZipFile:
+def download_cta_zip() -> Tuple[zipfile.ZipFile, BytesIO]:
     """Download CTA schedule data from transitchicago.com
 
     Returns:
         zipfile.ZipFile: A zipfile of the latest GTFS schedule data from transitchicago.com
     """
     logger.info('Downloading CTA data')
-    CTA_GTFS = zipfile.ZipFile(
-        BytesIO(
+    zip_bytes_io = BytesIO(
             requests.get("https://www.transitchicago.com/downloads/sch_data/google_transit.zip"
             ).content
         )
-    )
+    CTA_GTFS = zipfile.ZipFile(zip_bytes_io)
     logging.info('Download complete')
-    return CTA_GTFS
+    return CTA_GTFS, zip_bytes_io
  
 
 
@@ -385,7 +384,7 @@ def download_extract_format(version_id: str = None) -> GTFSFeed:
         GTFSFeed: A GTFSFeed object with formated dates
     """
     if version_id is None:
-        CTA_GTFS = download_cta_zip()
+        CTA_GTFS, _ = download_cta_zip()
     else:
         CTA_GTFS = download_zip(version_id)
     data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)

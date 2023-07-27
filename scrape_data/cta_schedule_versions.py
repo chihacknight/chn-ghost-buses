@@ -54,6 +54,6 @@ def keys(bucket_name, prefix='/', delimiter='/', start_after=''):
     for page in s3_paginator.paginate(Bucket=bucket_name, Prefix=prefix, StartAfter=start_after):
         for content in page.get('Contents', ()):
             if content['Key'] in [f'cta_route_daily_summary_{date}.csv', f'google_transit_{date}.zip']:
-                yield f"{content['Key']} exists"
+                print(f"{content['Key']} exists")
 
 keys('chn-ghost-buses-public')

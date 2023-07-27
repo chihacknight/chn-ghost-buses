@@ -42,3 +42,18 @@ route_daily_summary.to_csv(csv_buffer)
 print(f'Saving cta_route_daily_summary_{date}.csv to public bucket')
 s3.Object('chn-ghost-buses-public', f'cta_route_daily_summary_{date}.csv')\
     .put(Body=csv_buffer.getvalue())
+
+
+# https://stackoverflow.com/questions/30249069/listing-contents-of-a-bucket-with-boto3
+print('Confirm that objects exist in bucket')
+s3_paginator = client.get_paginator('list_objects_v2')
+
+def keys(bucket_name, prefix='/', delimiter='/', start_after=''):
+    prefix = prefix.lstrip(delimiter)
+    start_after = (start_after or prefix) if prefix.endswith(delimiter) else start_after
+    for page in s3_paginator.paginate(Bucket=bucket_name, Prefix=prefix, StartAfter=start_after):
+        for content in page.get('Contents', ()):
+            if content['Key'] in [f'cta_route_daily_summary_{date}.csv', f'google_transit_{date}.zip']:
+                yield f"{content['Key']} exists"
+
+keys('chn-ghost-buses-public')

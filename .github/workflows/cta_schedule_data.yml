@@ -34,7 +34,6 @@ jobs:
    
           
   save-schedule-daily-summary:
-    needs: download-cta-schedule-data
     runs-on: ubuntu-latest
 
     steps:
@@ -51,8 +50,8 @@ jobs:
 
         run: |
           pip install -r requirements.txt
-          python -c 'from scrape_data.cta_schedule_versions \
-           import save_route_daily_summary; save_route_daily_summary()' \ 
+          python -c 'from scrape_data.cta_schedule_versions import save_route_daily_summary; \
+           save_route_daily_summary()' \ 
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
     
       

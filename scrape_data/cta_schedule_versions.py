@@ -22,8 +22,9 @@ s3 = boto3.resource(
 
 today = pendulum.now().to_date_string()
 
+CTA_GTFS, zipfile_bytes_io = sga.download_cta_zip()
+
 def save_cta_zip():
-    _, zipfile_bytes_io = sga.download_cta_zip()
     print(f'Saving zipfile available at '
         f'https://www.transitchicago.com/downloads/sch_data/google_transit.zip '
         f'on {today} to public bucket')
@@ -39,7 +40,8 @@ def save_cta_zip():
             ])
 
 def save_route_daily_summary():
-    data = sga.download_extract_format()
+    data = sga.GTFSFeed.extract_data(CTA_GTFS)
+    data = sga.format_dates_hours(data)
     trip_summary = sga.make_trip_summary(data)
 
     route_daily_summary = (

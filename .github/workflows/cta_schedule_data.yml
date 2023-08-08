@@ -1,4 +1,4 @@
-name: Automated job
+name: Automate CTA schedule downloads
 
 on:
   push:
@@ -20,11 +20,39 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
+        
       - name: Download and save CTA schedule data
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
         run: |
           pip install -r requirements.txt
-          python -m scrape_data.cta_schedule_versions $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+          python -c 'from scrape_data.cta_schedule_versions import save_cta_zip; \
+           save_cta_zip()' \
+           $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+   
+          
+  save-schedule-daily-summary:
+    needs: download-cta-schedule-data
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: 'Save schedule summaries'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_schedule_versions \
+           import save_route_daily_summary; save_route_daily_summary()' \ 
+           $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+    
+      

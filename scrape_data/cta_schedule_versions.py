@@ -20,40 +20,55 @@ s3 = boto3.resource(
     aws_secret_access_key=SECRET_KEY
 )
 
-date = pendulum.now().to_date_string()
+today = pendulum.now().to_date_string()
 
-zipfile, zipfile_bytes_io = sga.download_cta_zip()
-print(f'Saving zipfile available at '
-      f'https://www.transitchicago.com/downloads/sch_data/google_transit.zip '
-      f'on {date} to public bucket')
-zipfile_bytes_io.seek(0)
-client.upload_fileobj(zipfile_bytes_io, 'chn-ghost-buses-public', f'google_transit_{date}.zip')
+def save_cta_zip():
+    _, zipfile_bytes_io = sga.download_cta_zip()
+    print(f'Saving zipfile available at '
+        f'https://www.transitchicago.com/downloads/sch_data/google_transit.zip '
+        f'on {today} to public bucket')
+    zipfile_bytes_io.seek(0)
+    client.upload_fileobj(
+        zipfile_bytes_io,
+        'chn-ghost-buses-public',
+        f'cta_schedule_zipfiles_raw/google_transit_{today}.zip'
+    )
+    print('Confirm that object exists in bucket')
+    keys('chn-ghost-buses-public', [
+                f'cta_schedule_zipfiles_raw/google_transit_{today}.zip'
+            ])
 
-data = sga.download_extract_format()
-trip_summary = sga.make_trip_summary(data)
+def save_route_daily_summary():
+    data = sga.download_extract_format()
+    trip_summary = sga.make_trip_summary(data)
 
-route_daily_summary = (
-    sga.summarize_date_rt(trip_summary)
-)
+    route_daily_summary = (
+        sga.summarize_date_rt(trip_summary)
+    )
+    route_daily_summary['date'] = route_daily_summary['date'].astype(str)
+    route_daily_summary_today = route_daily_summary.loc[route_daily_summary['date'] == today]
 
-csv_buffer = StringIO()
-route_daily_summary.to_csv(csv_buffer)
+    csv_buffer = StringIO()
+    route_daily_summary_today.to_csv(csv_buffer)
 
-print(f'Saving cta_route_daily_summary_{date}.csv to public bucket')
-s3.Object('chn-ghost-buses-public', f'cta_route_daily_summary_{date}.csv')\
-    .put(Body=csv_buffer.getvalue())
+    print(f'Saving cta_route_daily_summary_{today}.csv to public bucket')
+    s3.Object(
+        'chn-ghost-buses-public',
+        f'schedule_summaries/daily_job/cta_route_daily_summary_{today}.csv')\
+        .put(Body=csv_buffer.getvalue())
+
+    print('Confirm that object exists in bucket')
+    keys('chn-ghost-buses-public', [
+                f'schedule_summaries/daily_job/cta_route_daily_summary_{today}.csv',
+            ])
 
 
 # https://stackoverflow.com/questions/30249069/listing-contents-of-a-bucket-with-boto3
-print('Confirm that objects exist in bucket')
-s3_paginator = client.get_paginator('list_objects_v2')
-
-def keys(bucket_name, prefix='/', delimiter='/', start_after=''):
+def keys(bucket_name: str, filenames: list, prefix: str='/', delimiter: str='/', start_after: str=''):
+    s3_paginator = client.get_paginator('list_objects_v2')
     prefix = prefix.lstrip(delimiter)
     start_after = (start_after or prefix) if prefix.endswith(delimiter) else start_after
     for page in s3_paginator.paginate(Bucket=bucket_name, Prefix=prefix, StartAfter=start_after):
         for content in page.get('Contents', ()):
-            if content['Key'] in [f'cta_route_daily_summary_{date}.csv', f'google_transit_{date}.zip']:
+            if content['Key'] in filenames:
                 print(f"{content['Key']} exists")
-
-keys('chn-ghost-buses-public')

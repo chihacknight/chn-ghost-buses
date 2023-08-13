@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
         
       - name: Download and save CTA schedule data
 
@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
       
       - name: 'Save schedule summaries'
         run: |
@@ -59,7 +59,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
       
       - name: 'Save realtime summaries'
 

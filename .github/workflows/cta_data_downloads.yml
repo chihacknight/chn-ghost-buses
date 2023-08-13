@@ -10,7 +10,7 @@ on:
     - cron: 30 17 * * * 
 
 env: 
-  PYTHON_VERSION: '3.10'
+  PYTHON_VERSION: 3.10
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
         
       - name: Download and save CTA schedule data
 
@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
       
       - name: 'Save schedule summaries'
         run: |
@@ -59,10 +59,10 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: $PYTHON_VERSION
+          python-version: '$PYTHON_VERSION'
       
       - name: 'Save realtime summaries'
-      
+
         run: |
           pip install -r requirements.txt
           python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \

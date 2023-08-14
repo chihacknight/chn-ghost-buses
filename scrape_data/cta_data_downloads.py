@@ -23,7 +23,7 @@ s3 = boto3.resource(
     aws_secret_access_key=SECRET_KEY
 )
 
-today = pendulum.now().to_date_string()
+today = pendulum.now('America/Chicago').to_date_string()
 
 CTA_GTFS, zipfile_bytes_io = sga.download_cta_zip()
 

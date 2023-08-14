@@ -82,16 +82,21 @@ def save_route_daily_summary() -> None:
 
 
 def save_realtime_daily_summary() -> None:
-    # This will be run at 5 pm Central time. bus_full_day_data_v2/{today}.csv 
-    # will be in the public bucket by 11 am Central time, so there shouldn't be any issues.
+    if pendulum.now("America/Chicago").hour >= 11:
+        end_date = pendulum.yesterday("America/Chicago")
+    else: 
+        end_date = pendulum.now("America/Chicago").subtract(days=2)
+    
+    end_date = end_date.to_date_string()
+
     daily_data = pd.read_csv(
-                (csrt.BASE_PATH / f"bus_full_day_data_v2/{today}.csv")
+                (csrt.BASE_PATH / f"bus_full_day_data_v2/{end_date}.csv")
                 .as_uri(),
                 low_memory=False
             )
 
     daily_data = csrt.make_daily_summary(daily_data)
-    filename = f'realtime_summaries/daily_job/bus_full_day_data_v2/{today}.csv'
+    filename = f'realtime_summaries/daily_job/bus_full_day_data_v2/{end_date}.csv'
     save_csv_to_bucket(daily_data, filename=filename)
 
     print(f'Confirm that {filename} exists in bucket')

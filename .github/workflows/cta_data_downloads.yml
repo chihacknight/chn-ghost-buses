@@ -29,7 +29,7 @@ jobs:
 
         run: |
           pip install -r requirements.txt
-          python -c 'from scrape_data.cta_schedule_versions import save_cta_zip; \
+          python -c 'from scrape_data.cta_data_downloads import save_cta_zip; \
            save_cta_zip()' \
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
    
@@ -47,7 +47,7 @@ jobs:
       - name: 'Save schedule summaries'
         run: |
           pip install -r requirements.txt
-          python -c 'from scrape_data.cta_schedule_versions import save_route_daily_summary; \
+          python -c 'from scrape_data.cta_data_downloads import save_route_daily_summary; \
            save_route_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
     
       

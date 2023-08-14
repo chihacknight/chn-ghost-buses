@@ -98,3 +98,24 @@ There are a few types of data available in the public S3 bucket. The **data** li
     errors = pd.concat(errors_list)
     ```
 
+## Website automation
+Eventually, the data for the map at [ghostbuses.com](https://ghostbuses.com/map) will be updated daily using a GitHub action and sent to the frontend. The data flow will then look like
+
+```mermaid
+graph TD;
+GitHubAction[GitHub actions file in .github/workflows/cta_data_downloads.yml] --> |calls| py[scrape_data/cta_data_downloads.py]
+
+py --> |save_cta_zip| s3_zip[zipfile of schedule data from <a href='https://www.transitchicago.com/downloads/sch_data/'> CTA </a><br/>saved to s3 daily]
+
+py --> |save_sched_daily_summary| s3_sched[schedule data summary csv saved to s3 daily]
+
+py --> |save_realtime_daily_summary| s3_rt[realtime data summary csv saved to s3 daily]
+
+s3_rt --> |used by| py_compare[data_analysis/compare_scheduled_and_rt.py]
+
+s3_sched --> |used by| py_compare
+
+py_compare --> |"compare_sched_and_rt <br/> (Does not exist yet)"| s3_or_frontend[JSON file saved to s3 or GitHub repo]
+
+s3_or_frontend --> |used by| frontend[<a href='https://github.com/chihacknight/ghost-buses-frontend'> Ghost buses frontend repo </a>]
+```

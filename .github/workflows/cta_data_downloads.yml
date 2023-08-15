@@ -47,8 +47,8 @@ jobs:
       - name: 'Save schedule summaries'
         run: |
           pip install -r requirements.txt
-          python -c 'from scrape_data.cta_data_downloads import save_route_daily_summary; \
-           save_route_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+          python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
+           save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
     
       
   save-realtime-daily-summary:

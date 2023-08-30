@@ -359,16 +359,15 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
         zipfile.ZipFile: A zipfile for the CTA version id.
     """
     logger.info('Downloading CTA data')
-    CTA_GTFS = zipfile.ZipFile(
-        BytesIO(
+    zipfile_bytes_io = BytesIO(
             requests.get(
                 f"https://transitfeeds.com/p/chicago-transit-authority"
                 f"/165/{version_id}/download"
             ).content
         )
-    )
+    CTA_GTFS = zipfile.ZipFile(zipfile_bytes_io)
     logging.info('Download complete')
-    return CTA_GTFS
+    return CTA_GTFS, zipfile_bytes_io
 
 
 def download_extract_format(version_id: str = None) -> GTFSFeed:

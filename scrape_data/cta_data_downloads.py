@@ -60,7 +60,7 @@ def save_csv_to_bucket(df: pd.DataFrame, filename: str) -> None:
         .put(Body=csv_buffer.getvalue())
 
 
-def save_sched_daily_summary(date_range: List[str, str] = None) -> None:
+def save_sched_daily_summary(date_range: List[str] = None) -> None:
     if date_range is None:
         date_range = [today]
         print(f"No date range given. Using {today} only")

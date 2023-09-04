@@ -100,7 +100,7 @@ def save_sched_daily_summary(date_range: List[str] = None) -> None:
         zip_bytes = BytesIO()
         zip_bytes.seek(0)
         client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
-        zipfilesched = sga.zipfile.Zipfile(zip_bytes)
+        zipfilesched = sga.zipfile.ZipFile(zip_bytes)
         fdate = extract_date(fname)
         s3zip_list.append(
             {

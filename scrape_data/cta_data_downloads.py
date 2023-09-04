@@ -77,6 +77,11 @@ def save_sched_daily_summary(date_range: List[str] = None) -> None:
         csrt.BUCKET_PUBLIC,
         zip_filename_list
     )
+    def confirm_saved_files(file_dict: dict) -> None:
+        for fname in ['csv_filenames', 'zip_filenames']:
+            print('Confirm that ' + ', '.join(file_dict[fname])
+                + ' exist in bucket')  
+            _ = keys(csrt.BUCKET_PUBLIC, file_dict[fname])
     
     def extract_date(fname: str) -> str:
         return fname.split('_')[-1].split('.')[0]
@@ -115,40 +120,7 @@ def save_sched_daily_summary(date_range: List[str] = None) -> None:
         'zip_filenames': [gtfs['zip_filename'] for gtfs in s3zip_list],
         'summaries': [create_route_summary(gtfs['zip']) for gtfs in s3zip_list],
         'csv_filenames': [gtfs['csv_filename'] for gtfs in s3zip_list]
-    } 
-    
-    transitfeeds_list = list(set(zip_filename_list).difference(set(found_list)))
-    print(', '.join(transitfeeds_list) + ' were not found in s3. Using transitfeeds.com')
-    transitfeeds_dates = []  
-    for fname in transitfeeds_list:
-        # Extract date from string after splitting on '_' and then '.'
-        fdate = extract_date(fname)
-        transitfeeds_dates.append(fdate)
-    
-    
-    transitfeeds_dates = sorted(transitfeeds_dates)
-    schedule_list = csrt.create_schedule_list(month=5, year=2022)
-    schedule_list_filtered = [
-        s for s in schedule_list 
-        if s['feed_start_date'] >= min(transitfeeds_dates)
-        and s['feed_start_date'] <= max(transitfeeds_dates)
-    ]
-    
-
-    trip_summaries_transitfeeds_dict = {'zip_filenames': [], 'zips': [], 'csv_filenames': [],
-                                        'summaries': []}
-    
-    for sched in schedule_list_filtered:
-        CTA_GTFS, zipfile_bytes_io = sga.download_zip(sched['schedule_version'])
-        trip_summaries_transitfeeds_dict['zip_filenames'].append(
-            f"transitfeeds_schedule_zipfiles_raw/{sched['schedule_version']}.zip"
-        )
-        trip_summaries_transitfeeds_dict['zips'].append((CTA_GTFS, zipfile_bytes_io))
-        trip_summaries_transitfeeds_dict['summaries'].append(create_route_summary(CTA_GTFS))
-        trip_summaries_transitfeeds_dict['csv_filenames'].append(
-            f'schedule_summaries/daily_job/transitfeeds/'
-            f'transitfeeds_route_daily_summary_v{sched["schedule_version"]}.csv'
-        )
+    }
 
     print(f'Saving cta schedule summary files in {date_range} to public bucket')
     for filename, summary in zip(
@@ -156,31 +128,61 @@ def save_sched_daily_summary(date_range: List[str] = None) -> None:
         s3_route_daily_summary_dict['summaries']
     ):
         save_csv_to_bucket(summary, filename=filename)
+    
+    confirm_saved_files(s3_route_daily_summary_dict)
 
-    print(f'Saving transitfeeds schedule summary files and zip files '
-          f'in {date_range} to public bucket')
-    for csv_filename, summary, zip_filename, zipfile in zip(
-        trip_summaries_transitfeeds_dict['csv_filenames'],
-        trip_summaries_transitfeeds_dict['summaries'],
-        trip_summaries_transitfeeds_dict['zip_filenames'],
-        trip_summaries_transitfeeds_dict['zips']
-    ):
-        save_csv_to_bucket(summary, filename=csv_filename)
-        # Save the zip file
-        client.upload_fileobj(
-            zipfile[1],
-            csrt.BUCKET_PUBLIC,
-            zip_filename
-        )
-
-    for fname in ['csv_filenames', 'zip_filenames']:
-        print('Confirm that ' + ', '.join(s3_route_daily_summary_dict[fname])
-            + ' exist in bucket')  
-        _ = keys(csrt.BUCKET_PUBLIC, s3_route_daily_summary_dict[fname])
+    transitfeeds_list = list(set(zip_filename_list).difference(set(found_list)))
+    if transitfeeds_list:
+        print(', '.join(transitfeeds_list) + ' were not found in s3. Using transitfeeds.com')
+        transitfeeds_dates = []  
+        for fname in transitfeeds_list:
+            # Extract date from string after splitting on '_' and then '.'
+            fdate = extract_date(fname)
+            transitfeeds_dates.append(fdate)
         
-        print('Confirm that ' + ', '.join(trip_summaries_transitfeeds_dict[fname])
-            + ' exists in bucket')
-        _ = keys(csrt.BUCKET_PUBLIC, trip_summaries_transitfeeds_dict[fname])
+        
+        transitfeeds_dates = sorted(transitfeeds_dates)
+        schedule_list = csrt.create_schedule_list(month=5, year=2022)
+        schedule_list_filtered = [
+            s for s in schedule_list 
+            if s['feed_start_date'] >= min(transitfeeds_dates)
+            and s['feed_start_date'] <= max(transitfeeds_dates)
+        ]
+    
+
+        trip_summaries_transitfeeds_dict = {'zip_filenames': [], 'zips': [], 'csv_filenames': [],
+                                            'summaries': []}
+        
+        for sched in schedule_list_filtered:
+            CTA_GTFS, zipfile_bytes_io = sga.download_zip(sched['schedule_version'])
+            trip_summaries_transitfeeds_dict['zip_filenames'].append(
+                f"transitfeeds_schedule_zipfiles_raw/{sched['schedule_version']}.zip"
+            )
+            trip_summaries_transitfeeds_dict['zips'].append((CTA_GTFS, zipfile_bytes_io))
+            trip_summaries_transitfeeds_dict['summaries'].append(create_route_summary(CTA_GTFS))
+            trip_summaries_transitfeeds_dict['csv_filenames'].append(
+                f'schedule_summaries/daily_job/transitfeeds/'
+                f'transitfeeds_route_daily_summary_v{sched["schedule_version"]}.csv'
+            )
+        print(
+            f'Saving transitfeeds schedule summary files and zip files '
+            f'in {date_range} to public bucket'
+        )
+        for csv_filename, summary, zip_filename, zipfile in zip(
+            trip_summaries_transitfeeds_dict['csv_filenames'],
+            trip_summaries_transitfeeds_dict['summaries'],
+            trip_summaries_transitfeeds_dict['zip_filenames'],
+            trip_summaries_transitfeeds_dict['zips']
+        ):
+            save_csv_to_bucket(summary, filename=csv_filename)
+            # Save the zip file
+            client.upload_fileobj(
+                zipfile[1],
+                csrt.BUCKET_PUBLIC,
+                zip_filename
+            ) 
+        confirm_saved_files(trip_summaries_transitfeeds_dict)
+    
 
 def save_realtime_daily_summary(date: str = None) -> None:
     if date is None:

@@ -52,7 +52,7 @@ jobs:
           python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
            save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
           python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-           save_sched_daily_summary(["2022-05-20", "2023-05-20"])' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+           save_sched_daily_summary(["2023-05-20", "2023-08-20"])' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
           
     
       

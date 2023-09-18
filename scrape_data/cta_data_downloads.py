@@ -2,10 +2,11 @@ import boto3
 import sys
 import data_analysis.static_gtfs_analysis as sga
 import data_analysis.compare_scheduled_and_rt as csrt
+import data_analysis.plots as plots
 import pendulum
 from io import StringIO, BytesIO
 import pandas as pd
-from typing import List
+import typing
 
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
@@ -60,45 +61,144 @@ def save_csv_to_bucket(df: pd.DataFrame, filename: str) -> None:
         .put(Body=csv_buffer.getvalue())
 
 
-def save_sched_daily_summary(date_range: List[str] = None) -> None:
-    if date_range is None:
-        date_range = [today]
-        print(f"No date range given. Using {today} only")
-            
+def find_s3_zipfiles(date_range: typing.List[str]) -> typing.Tuple[list]:
     start_date = pendulum.parse(min(date_range))
     end_date = pendulum.parse(max(date_range))
     period = pendulum.period(start_date, end_date)
     full_date_range = [dt.to_date_string() for dt in period.range('days')]
     zip_filename_list = [f'cta_schedule_zipfiles_raw/google_transit_{date}.zip'
                          for date in full_date_range]
-
-    # Check for files in bucket.
     found_list = keys(
         csrt.BUCKET_PUBLIC,
         zip_filename_list
     )
-    def confirm_saved_files(file_dict: dict) -> None:
-        for fname in ['csv_filenames', 'zip_filenames']:
-            print('Confirm that ' + ', '.join(file_dict[fname])
-                + ' exist in bucket')  
-            _ = keys(csrt.BUCKET_PUBLIC, file_dict[fname])
-    
-    def extract_date(fname: str) -> str:
-        return fname.split('_')[-1].split('.')[0]
+    return zip_filename_list, found_list
 
-    def create_route_summary(CTA_GTFS: sga.GTFSFeed) -> pd.DataFrame:
-        data = sga.GTFSFeed.extract_data(CTA_GTFS)
+
+def find_transitfeeds_zipfiles(
+        full_list: typing.List[str],
+        found_list: typing.List[str]) -> typing.List[str]:
+    
+    transitfeeds_list = list(set(full_list).difference(set(found_list)))
+    if transitfeeds_list:
+        print(', '.join(transitfeeds_list) + ' were not found in s3. Using transitfeeds.com')
+        transitfeeds_dates = []  
+        for fname in transitfeeds_list:
+            # Extract date from string after splitting on '_' and then '.'
+            fdate = extract_date(fname)
+            transitfeeds_dates.append(fdate)
+        
+        
+        transitfeeds_dates = sorted(transitfeeds_dates)
+        schedule_list = csrt.create_schedule_list(month=5, year=2022)
+        schedule_list_filtered = [
+            s for s in schedule_list 
+            if s['feed_start_date'] >= min(transitfeeds_dates)
+            and s['feed_start_date'] <= max(transitfeeds_dates)
+        ]
+        return schedule_list_filtered
+    else:
+        print("All records found in s3 from transitchicago.com")
+        return full_list
+
+
+def compare_realtime_sched(
+        date_range: typing.List[str] = ['2022-05-20', today]) -> None:
+           
+    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
+    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
+    # Extract data from s3 zipfiles
+    s3_data_list = []
+    for fname in found_list:
+        zip_bytes = BytesIO()
+        zip_bytes.seek(0)
+        client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
+        zipfilesched = sga.zipfile.ZipFile(zip_bytes)
+        data = sga.GTFSFeed.extract_data(zipfilesched)
         data = sga.format_dates_hours(data)
-        trip_summary = sga.make_trip_summary(data)
-
-        route_daily_summary = (
-            sga.summarize_date_rt(trip_summary)
-        )
-
-        route_daily_summary['date'] = route_daily_summary['date'].astype(str)
-        route_daily_summary_today = route_daily_summary.loc[route_daily_summary['date'].isin(date_range)]
-        return route_daily_summary_today
+        s3_data_list.append({'fname': fname, 'data': data})
     
+    transit_feeds_GTFS_data_list = csrt.create_GTFS_data_list(schedule_list_filtered)['GTFS_data_list']
+    joined_list = [*s3_data_list, *transit_feeds_GTFS_data_list]
+    
+        
+    # Convert from list of dictionaries to dictionary with list values
+    joined_dict = pd.DataFrame(joined_list).to_dict(orient='list')
+    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data)}
+      for fname, data in joined_dict.items()]
+
+    agg_info = csrt.AggInfo()
+    print('Creating combined_long_df and summary_df')
+    combined_long_df, summary_df = csrt.combine_real_time_rt_comparison(
+        schedule_feeds=schedule_list_filtered,
+        schedule_data_list=schedule_data_list,
+        agg_info=agg_info
+    )    
+
+    day_type = 'wk'
+    start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
+    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
+
+    summary_gdf_geo = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type=day_type)
+    summary_kwargs = {'column': 'ratio'}
+    save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
+
+    plots.save_json(
+        summary_gdf_geo=summary_gdf_geo, 
+        summary_kwargs=summary_kwargs,
+        save_name=save_name
+    )
+    
+    s3_data_json_path = 'frontend_data_files/data.json'
+    print(f'Saving data.json to {s3_data_json_path}')
+
+    data_json = plots.create_frontend_json(
+        json_file=f'{save_name}.json',
+        start_date=start_date,
+        end_date=end_date,
+        save=False
+    )
+    # Save data.json to s3 for now. This will eventually live in the frontend repo.
+    s3.Object(
+        csrt.BUCKET_PUBLIC,
+        f'{s3_data_json_path}')\
+        .put(Body=data_json)
+
+    _ = keys(csrt.BUCKET_PUBLIC, ['data.json'])
+
+
+def confirm_saved_files(file_dict: dict) -> None:
+    for fname in ['csv_filenames', 'zip_filenames']:
+        print('Confirm that ' + ', '.join(file_dict[fname])
+            + ' exist in bucket')  
+        _ = keys(csrt.BUCKET_PUBLIC, file_dict[fname])
+
+
+def extract_date(fname: str) -> str:
+    return fname.split('_')[-1].split('.')[0]
+
+
+def create_route_summary(CTA_GTFS: sga.GTFSFeed) -> pd.DataFrame:
+    data = sga.GTFSFeed.extract_data(CTA_GTFS)
+    data = sga.format_dates_hours(data)
+    trip_summary = sga.make_trip_summary(data)
+
+    route_daily_summary = (
+        sga.summarize_date_rt(trip_summary)
+    )
+
+    route_daily_summary['date'] = route_daily_summary['date'].astype(str)
+    route_daily_summary_today = route_daily_summary.loc[route_daily_summary['date'].isin(date_range)]
+    return route_daily_summary_today
+
+
+def save_sched_daily_summary(date_range: typing.List[str] = None) -> None:
+    if date_range is None:
+        date_range = [today]
+        print(f"No date range given. Using {today} only")
+            
+    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
+ 
     print('Using zipfiles found in public bucket')
     s3zip_list = []
     for fname in found_list:
@@ -130,26 +230,10 @@ def save_sched_daily_summary(date_range: List[str] = None) -> None:
         save_csv_to_bucket(summary, filename=filename)
     
     confirm_saved_files(s3_route_daily_summary_dict)
-
-    transitfeeds_list = list(set(zip_filename_list).difference(set(found_list)))
-    if transitfeeds_list:
-        print(', '.join(transitfeeds_list) + ' were not found in s3. Using transitfeeds.com')
-        transitfeeds_dates = []  
-        for fname in transitfeeds_list:
-            # Extract date from string after splitting on '_' and then '.'
-            fdate = extract_date(fname)
-            transitfeeds_dates.append(fdate)
-        
-        
-        transitfeeds_dates = sorted(transitfeeds_dates)
-        schedule_list = csrt.create_schedule_list(month=5, year=2022)
-        schedule_list_filtered = [
-            s for s in schedule_list 
-            if s['feed_start_date'] >= min(transitfeeds_dates)
-            and s['feed_start_date'] <= max(transitfeeds_dates)
-        ]
+    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
     
-
+    # Only download transitfeeds for files not found in s3.
+    if set(found_list) != set(zip_filename_list):
         trip_summaries_transitfeeds_dict = {'zip_filenames': [], 'zips': [], 'csv_filenames': [],
                                             'summaries': []}
         
@@ -208,6 +292,7 @@ def save_realtime_daily_summary(date: str = None) -> None:
 
     print(f'Confirm that {filename} exists in bucket')
     _ = keys(csrt.BUCKET_PUBLIC, [filename])
+
 
 # https://stackoverflow.com/questions/30249069/listing-contents-of-a-bucket-with-boto3
 def keys(bucket_name: str, filenames: list,

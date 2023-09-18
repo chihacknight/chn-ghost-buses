@@ -385,7 +385,7 @@ def download_extract_format(version_id: str = None) -> GTFSFeed:
     if version_id is None:
         CTA_GTFS, _ = download_cta_zip()
     else:
-        CTA_GTFS = download_zip(version_id)
+        CTA_GTFS, _ = download_zip(version_id)
     data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
     data = format_dates_hours(data)
     return data

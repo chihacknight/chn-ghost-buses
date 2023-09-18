@@ -78,7 +78,7 @@ jobs:
   
   save-frontend-map-json:
     runs-on: ubuntu-latest
-
+    needs: [save-realtime-daily-summary, save-schedule-daily-summary]
     steps:
       - uses: actions/checkout@v3
 

@@ -1060,9 +1060,7 @@ def create_frontend_json(json_file: str, start_date: str, end_date: str, save_pa
     """
     with open(DATA_PATH / json_file) as json_data:
         data = json.load(json_data)
-        start_dt = pendulum.parse(start_date).format('MMMM D, YYYY')
-        end_dt = pendulum.parse(end_date).format('MMMM D, YYYY')
-        data['dates'] = {'start': start_dt, 'end': end_dt}
+        data['dates'] = {'start': start_date, 'end': end_date}
     if save:
         if save_path is None:
             raise ValueError('You must specify a location to save the json file')

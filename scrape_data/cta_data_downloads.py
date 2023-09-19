@@ -118,7 +118,7 @@ def compare_realtime_sched(
         data = sga.format_dates_hours(data)
         s3_data_list.append({'fname': fname, 'data': data})
     
-    transit_feeds_GTFS_data_list = csrt.create_GTFS_data_list(schedule_list_filtered)['GTFS_data_list']
+    transit_feeds_GTFS_data_list = csrt.create_GTFS_data_list(schedule_list_filtered, cta_download=False)['GTFS_data_list']
     joined_list = [*s3_data_list, *transit_feeds_GTFS_data_list]
     
         

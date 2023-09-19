@@ -62,6 +62,8 @@ class GTFSFeed:
                 165/20220718/download or https://www.transitchicago.com/downloads/sch_data/
             version_id (str, optional): The schedule version in use.
                 Defaults to None.
+            cta_download (bool): whether data is coming from the CTA directy (transitchicago.com)
+
 
         Returns:
             GTFSFeed: A GTFSFeed object containing multiple DataFrames

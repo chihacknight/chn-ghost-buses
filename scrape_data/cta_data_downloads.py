@@ -124,7 +124,7 @@ def compare_realtime_sched(
         
     # Convert from list of dictionaries to dictionary with list values
     joined_dict = pd.DataFrame(joined_list).to_dict(orient='list')
-    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data)}
+    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
       for fname, data in joined_dict.items()]
 
     agg_info = csrt.AggInfo()
@@ -178,7 +178,7 @@ def extract_date(fname: str) -> str:
     return fname.split('_')[-1].split('.')[0]
 
 
-def create_route_summary(CTA_GTFS: sga.GTFSFeed) -> pd.DataFrame:
+def create_route_summary(CTA_GTFS: sga.GTFSFeed, date_range: typing.List[str]) -> pd.DataFrame:
     data = sga.GTFSFeed.extract_data(CTA_GTFS)
     data = sga.format_dates_hours(data)
     trip_summary = sga.make_trip_summary(data)
@@ -218,7 +218,7 @@ def save_sched_daily_summary(date_range: typing.List[str] = None) -> None:
     
     s3_route_daily_summary_dict = {
         'zip_filenames': [gtfs['zip_filename'] for gtfs in s3zip_list],
-        'summaries': [create_route_summary(gtfs['zip']) for gtfs in s3zip_list],
+        'summaries': [create_route_summary(gtfs['zip'], date_range) for gtfs in s3zip_list],
         'csv_filenames': [gtfs['csv_filename'] for gtfs in s3zip_list]
     }
 
@@ -243,7 +243,7 @@ def save_sched_daily_summary(date_range: typing.List[str] = None) -> None:
                 f"transitfeeds_schedule_zipfiles_raw/{sched['schedule_version']}.zip"
             )
             trip_summaries_transitfeeds_dict['zips'].append((CTA_GTFS, zipfile_bytes_io))
-            trip_summaries_transitfeeds_dict['summaries'].append(create_route_summary(CTA_GTFS))
+            trip_summaries_transitfeeds_dict['summaries'].append(create_route_summary(CTA_GTFS, date_range))
             trip_summaries_transitfeeds_dict['csv_filenames'].append(
                 f'schedule_summaries/daily_job/transitfeeds/'
                 f'transitfeeds_route_daily_summary_v{sched["schedule_version"]}.csv'

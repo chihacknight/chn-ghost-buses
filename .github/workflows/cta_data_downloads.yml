@@ -1,9 +1,6 @@
 name: Automate CTA schedule and realtime downloads
 
 on:
-  push:
-    branches:
-    - 'automate-schedule-downloads'
 
   schedule:
     # Run every day at 12:30pm CST which is 5:30pm UTC

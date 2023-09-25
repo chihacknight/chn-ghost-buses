@@ -56,6 +56,7 @@ def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) 
         _, zipfile_bytes_io = sga.download_zip(version_id=val)
         zip_filename = f"transitfeeds_schedule_zipfiles_raw/{val}.zip"
         filename_list.append(zip_filename)
+        zipfile_bytes_io.seek(0)
         client.upload_fileobj(
                 zipfile_bytes_io,
                 csrt.BUCKET_PUBLIC,

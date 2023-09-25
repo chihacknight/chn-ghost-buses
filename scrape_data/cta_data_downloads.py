@@ -50,16 +50,19 @@ def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) 
         if s['feed_start_date'] >= min(date_range)
         and s['feed_start_date'] <= max(date_range)
     ]
+    filename_list = []
     for schedule_dict in schedule_list_filtered:
         val = schedule_dict['schedule_version']    
         _, zipfile_bytes_io = sga.download_zip(version_id=val)
         zip_filename = f"transitfeeds_schedule_zipfiles_raw/{val}.zip"
+        filename_list.append(zip_filename)
         client.upload_fileobj(
                 zipfile_bytes_io,
                 csrt.BUCKET_PUBLIC,
                 zip_filename
             )        
-
+    print(f'Confirm that files exist in s3')
+    keys('chn-ghost-buses-public', [filename_list])
  
 
 

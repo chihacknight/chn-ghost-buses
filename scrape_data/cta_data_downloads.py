@@ -63,7 +63,7 @@ def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) 
                 zip_filename
             )        
     print(f'Confirm that files exist in s3')
-    keys('chn-ghost-buses-public', [filename_list])
+    keys('chn-ghost-buses-public', filename_list)
  
 
 

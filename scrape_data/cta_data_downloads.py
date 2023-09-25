@@ -43,6 +43,26 @@ def save_cta_zip() -> None:
     keys('chn-ghost-buses-public', [filename])
 
 
+def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) -> None:
+    schedule_list = csrt.create_schedule_list(month=5, year=2022)
+    schedule_list_filtered = [
+        s for s in schedule_list 
+        if s['feed_start_date'] >= min(date_range)
+        and s['feed_start_date'] <= max(date_range)
+    ]
+    for schedule_dict in schedule_list_filtered:
+        val = schedule_dict['schedule_version']    
+        _, zipfile_bytes_io = sga.download_zip(version_id=val)
+        zip_filename = f"transitfeeds_schedule_zipfiles_raw/{val}.zip"
+        client.upload_fileobj(
+                zipfile_bytes_io,
+                csrt.BUCKET_PUBLIC,
+                zip_filename
+            )        
+
+ 
+
+
 def save_csv_to_bucket(df: pd.DataFrame, filename: str) -> None:
     """Save pandas DataFrame to csv in s3
 

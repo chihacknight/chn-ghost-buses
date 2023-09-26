@@ -126,28 +126,43 @@ def find_transitfeeds_zipfiles(
         return full_list
 
 
+def download_s3_file(fname: str) -> sga.GTFSFeed:
+    zip_bytes = BytesIO()
+    zip_bytes.seek(0)
+    client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
+    zipfilesched = sga.zipfile.ZipFile(zip_bytes)
+    data = sga.GTFSFeed.extract_data(zipfilesched)
+    data = sga.format_dates_hours(data)
+    return data
+
+
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:
            
-    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
-    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
+    _, found_list = find_s3_zipfiles(date_range=date_range)
+    schedule_list = csrt.create_schedule_list(month=5, year=2022)
+    schedule_list_filtered = [
+            s for s in schedule_list 
+            if s['feed_start_date'] >= min(date_range)
+            and s['feed_start_date'] <= max(date_range)
+        ]
+    # schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
     # Extract data from s3 zipfiles
     s3_data_list = []
     for fname in found_list:
-        zip_bytes = BytesIO()
-        zip_bytes.seek(0)
-        client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
-        zipfilesched = sga.zipfile.ZipFile(zip_bytes)
-        data = sga.GTFSFeed.extract_data(zipfilesched)
-        data = sga.format_dates_hours(data)
+        data = download_s3_file(fname)
+        
         s3_data_list.append({'fname': fname, 'data': data})
     
-    transit_feeds_GTFS_data_list = csrt.create_GTFS_data_list(schedule_list_filtered, cta_download=False)['GTFS_data_list']
-    joined_list = [*s3_data_list, *transit_feeds_GTFS_data_list]
-    
+    # TODO Download the zipfiles from s3 instead of transitfeeds.
+    for tfname in schedule_list_filtered:
+        
+        full_name = f"transitfeeds_schedule_zipfiles_raw/{tfname}.zip"
+        tfdata = download_s3_file(full_name)
+        s3_data_list.append({'fname': tfname, 'data': tfdata})
         
     # Convert from list of dictionaries to dictionary with list values
-    joined_dict = pd.DataFrame(joined_list).to_dict(orient='list')
+    joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
     schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
       for fname, data in joined_dict.items()]
 

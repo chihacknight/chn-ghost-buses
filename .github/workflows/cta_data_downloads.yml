@@ -35,7 +35,25 @@ jobs:
            save_cta_zip()' \
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
   
-  download-transitfeeds-data:
+  # download-transitfeeds-data:
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
+        
+  #     - name: Download and save transitfeeds.com schedule data
+
+  #       run: |
+  #         pip install -r requirements.txt
+  #         python -c 'from scrape_data.cta_data_downloads import save_transitfeeds_zip; \
+  #         save_transitfeeds_zip()' \
+  #         $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+        
+  save-schedule-daily-summary:
     runs-on: ubuntu-latest
 
     steps:
@@ -44,72 +62,54 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-        
-      - name: Download and save transitfeeds.com schedule data
-
+      
+      - name: 'Save schedule summaries'
+      # Test with no date and with date range
         run: |
           pip install -r requirements.txt
-          python -c 'from scrape_data.cta_data_downloads import save_transitfeeds_zip; \
-          save_transitfeeds_zip()' \
-          $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-        
-  # save-schedule-daily-summary:
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - uses: actions/checkout@v3
-
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-      
-  #     - name: 'Save schedule summaries'
-  #     # Test with no date and with date range
-  #       run: |
-  #         pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
+           save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
   #         python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-  #          save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-  #         python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-  #          save_sched_daily_summary(["2023-05-20", "2023-08-20"])' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+  #            save_sched_daily_summary(["2023-05-20", "2023-08-20"])' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
           
     
       
-  # save-realtime-daily-summary:
-  #   runs-on: ubuntu-latest
+  save-realtime-daily-summary:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       
-  #     - name: 'Save realtime summaries'
+      - name: 'Save realtime summaries'
 
-  #       run: |
-  #         pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
           
-  #         python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \
-  #          save_realtime_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+          python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \
+           save_realtime_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
   
   
-  # save-frontend-map-json:
-  #   runs-on: ubuntu-latest
-  #   needs: [save-realtime-daily-summary, save-schedule-daily-summary]
-  #   strategy:
-  #     fail-fast: false
-  #   steps:
-  #     - uses: actions/checkout@v3
+  save-frontend-map-json:
+    runs-on: ubuntu-latest
+    needs: [save-realtime-daily-summary, save-schedule-daily-summary]
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       
-  #     - name: 'Save data.json for frontend'
+      - name: 'Save data.json for frontend'
 
-  #       run: |
-  #         pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
           
-  #         python -c 'from scrape_data.cta_data_downloads import compare_realtime_sched; \
-  #          compare_realtime_sched()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+          python -c 'from scrape_data.cta_data_downloads import compare_realtime_sched; \
+           compare_realtime_sched()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
   

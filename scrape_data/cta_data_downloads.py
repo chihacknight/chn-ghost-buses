@@ -139,19 +139,12 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:
            
-    _, found_list = find_s3_zipfiles(date_range=date_range)
-    schedule_list = csrt.create_schedule_list(month=5, year=2022)
-    schedule_list_filtered = [
-            s for s in schedule_list 
-            if s['feed_start_date'] >= min(date_range)
-            and s['feed_start_date'] <= max(date_range)
-        ]
-    # schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
+    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
+    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
     # Extract data from s3 zipfiles
     s3_data_list = []
     for fname in found_list:
         data = download_s3_file(fname)
-        
         s3_data_list.append({'fname': fname, 'data': data})
     
     # TODO Download the zipfiles from s3 instead of transitfeeds.

@@ -52,9 +52,9 @@ def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) 
     ]
     filename_list = []
     for schedule_dict in schedule_list_filtered:
-        val = schedule_dict['schedule_version']    
-        _, zipfile_bytes_io = sga.download_zip(version_id=val)
-        zip_filename = f"transitfeeds_schedule_zipfiles_raw/{val}.zip"
+        version = schedule_dict['schedule_version']    
+        _, zipfile_bytes_io = sga.download_zip(version_id=version)
+        zip_filename = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
         filename_list.append(zip_filename)
         zipfile_bytes_io.seek(0)
         client.upload_fileobj(
@@ -151,11 +151,11 @@ def compare_realtime_sched(
         s3_data_list.append({'fname': fname, 'data': data})
     
     # TODO Download the zipfiles from s3 instead of transitfeeds.
-    for tfname in schedule_list_filtered:
-        
-        full_name = f"transitfeeds_schedule_zipfiles_raw/{tfname}.zip"
+    for tfdict in schedule_list_filtered:
+        version = tfdict['schedule_version']
+        full_name = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
         tfdata = download_s3_file(full_name)
-        s3_data_list.append({'fname': tfname, 'data': tfdata})
+        s3_data_list.append({'fname': version, 'data': tfdata})
         
     # Convert from list of dictionaries to dictionary with list values
     joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')

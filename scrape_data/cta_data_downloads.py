@@ -115,10 +115,12 @@ def find_transitfeeds_zipfiles(
         
         transitfeeds_dates = sorted(transitfeeds_dates)
         schedule_list = csrt.create_schedule_list(month=5, year=2022)
+        # Start of saving transitchicago.com zipfiles to s3 was 2023-07-28. Don't need to check
+        # after this date.
         schedule_list_filtered = [
             s for s in schedule_list 
             if s['feed_start_date'] >= min(transitfeeds_dates)
-            and s['feed_start_date'] <= max(transitfeeds_dates)
+            and s['feed_start_date'] <= '2023-07-28' 
         ]
         return schedule_list_filtered
     else:
@@ -127,6 +129,7 @@ def find_transitfeeds_zipfiles(
 
 
 def download_s3_file(fname: str) -> sga.GTFSFeed:
+    print(f'Downloading {fname} from s3')
     zip_bytes = BytesIO()
     zip_bytes.seek(0)
     client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)

@@ -43,12 +43,12 @@ def save_cta_zip() -> None:
     keys('chn-ghost-buses-public', [filename])
 
 
-def save_transitfeeds_zip(date_range: typing.List[str] = ['2022-05-20', today]) -> None:
+def save_transitfeeds_zip(start_date: str = '2022-05-20', end_date: str = today) -> None:
     schedule_list = csrt.create_schedule_list(month=5, year=2022)
     schedule_list_filtered = [
         s for s in schedule_list 
-        if s['feed_start_date'] >= min(date_range)
-        and s['feed_start_date'] <= max(date_range)
+        if s['feed_start_date'] >= start_date
+        and s['feed_start_date'] <= end_date
     ]
     filename_list = []
     for schedule_dict in schedule_list_filtered:

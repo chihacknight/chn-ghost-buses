@@ -35,24 +35,49 @@ jobs:
            save_cta_zip()' \
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
   
-  # download-transitfeeds-data:
-  #   runs-on: ubuntu-latest
+  upload_cta_list:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-        
-  #     - name: Download and save transitfeeds.com schedule data
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 'Upload cta list of zipfiles as an artifact'
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import download_cta_files_s3; \
+           download_cta_files_s3()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
 
-  #       run: |
-  #         pip install -r requirements.txt
-  #         python -c 'from scrape_data.cta_data_downloads import save_transitfeeds_zip; \
-  #         save_transitfeeds_zip()' \
-  #         $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-        
+      - uses: actions/upload-artifact@v3
+        with:
+          name: s3_data_list
+          path: s3_data_list
+
+  upload_transitfeeds_list:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 'Upload transitfeeds list of zipfiles as an artifact'
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import download_transitfeeds_files_s3; \
+          download_transitfeeds_files_s3()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: transitfeeds_data_list
+          path: transitfeeds_data_list
+  
+  
   save-schedule-daily-summary:
     runs-on: ubuntu-latest
 
@@ -68,10 +93,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-           save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-  #         python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-  #            save_sched_daily_summary(["2023-05-20", "2023-08-20"])' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-          
+           save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY        
     
       
   save-realtime-daily-summary:
@@ -105,8 +127,15 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: 'Save data.json for frontend'
+      - uses: actions/download-artifact@v3
+        with:
+          name: transitfeeds_data_list
 
+      - uses: actions/download-artifact@v3
+        with:
+          name: s3_data_list
+
+      - name: 'Save data.json for frontend'
         run: |
           pip install -r requirements.txt
           

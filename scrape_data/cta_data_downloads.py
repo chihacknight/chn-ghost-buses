@@ -8,7 +8,9 @@ from io import StringIO, BytesIO
 import pandas as pd
 import typing
 import pickle
+import logging
 
+LOGGER = logging.getLogger(__name__)
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
 
@@ -35,7 +37,7 @@ def save_cta_zip() -> None:
         f'on {today} to public bucket')
     filename = f'cta_schedule_zipfiles_raw/google_transit_{today}.zip'
     zipfile_bytes_io.seek(0)
-    client.upload_fileobj(
+    client.uploaFd_fileobj(
         zipfile_bytes_io,
         csrt.BUCKET_PUBLIC,
         filename
@@ -143,7 +145,9 @@ def download_cta_files_s3(date_range: typing.List[str] = ['2022-05-20', today]) 
     _, found_list = find_s3_zipfiles(date_range=date_range)
     s3_data_list = []
     for fname in found_list:
+        LOGGER.info(f"Downloading from S3: {fname}")
         data = download_s3_file(fname)
+        LOGGER.info(f"Successfully downloaded from S3: {fname}")
         s3_data_list.append({'fname': fname, 'data': data})
     
     with open('s3_data_list', 'wb') as fp:
@@ -155,9 +159,11 @@ def download_transitfeeds_files_s3(date_range: typing.List[str] = ['2022-05-20',
     schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
     transitfeeds_data_list = []
     for tfdict in schedule_list_filtered:
+        LOGGER.info(f"Downloading from S3: {tfdict}")
         version = tfdict['schedule_version']
         full_name = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
         tfdata = download_s3_file(full_name)
+        LOGGER.info(f"Successfully downloaded from S3: {tfdict}")
         transitfeeds_data_list.append({'fname': version, 'data': tfdata})
     with open('transitfeeds_data_list', 'wb') as fp:
         pickle.dump(transitfeeds_data_list, fp)

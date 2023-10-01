@@ -37,7 +37,7 @@ def save_cta_zip() -> None:
         f'on {today} to public bucket')
     filename = f'cta_schedule_zipfiles_raw/google_transit_{today}.zip'
     zipfile_bytes_io.seek(0)
-    client.uploaFd_fileobj(
+    client.upload_fileobj(
         zipfile_bytes_io,
         csrt.BUCKET_PUBLIC,
         filename
@@ -137,7 +137,9 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
     zip_bytes.seek(0)
     client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
     zipfilesched = sga.zipfile.ZipFile(zip_bytes)
+    LOGGER.info('Extracting data')
     data = sga.GTFSFeed.extract_data(zipfilesched)
+    LOGGER.info('Extraction successful')
     data = sga.format_dates_hours(data)
     return data
 
@@ -150,9 +152,10 @@ def download_cta_files_s3(date_range: typing.List[str] = ['2022-05-20', today]) 
         LOGGER.info(f"Successfully downloaded from S3: {fname}")
         s3_data_list.append({'fname': fname, 'data': data})
     
+    LOGGER.info(f'Pickling s3_data_list')
     with open('s3_data_list', 'wb') as fp:
         pickle.dump(s3_data_list, fp)
-
+    LOGGER.info(f'Pickling done')
 
 def download_transitfeeds_files_s3(date_range: typing.List[str] = ['2022-05-20', today]) -> None:
     zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
@@ -165,9 +168,10 @@ def download_transitfeeds_files_s3(date_range: typing.List[str] = ['2022-05-20',
         tfdata = download_s3_file(full_name)
         LOGGER.info(f"Successfully downloaded from S3: {tfdict}")
         transitfeeds_data_list.append({'fname': version, 'data': tfdata})
+    LOGGER.info('Pickling file transitfeeds_data_list')
     with open('transitfeeds_data_list', 'wb') as fp:
         pickle.dump(transitfeeds_data_list, fp)
-
+    LOGGER.info('Pickling successful')
 
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:

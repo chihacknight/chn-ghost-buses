@@ -20,7 +20,7 @@ env:
 # See https://github.com/actions/runner-images/issues/6680
 jobs:
   download-cta-schedule-data:
-    runs-on: ubuntu-20.04
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -38,7 +38,7 @@ jobs:
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
           
   save-schedule-daily-summary:
-    runs-on: ubuntu-20.04
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -55,7 +55,7 @@ jobs:
            save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY        
     
   save-realtime-daily-summary:
-    runs-on: ubuntu-20.04
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -74,7 +74,7 @@ jobs:
   
   
   save-frontend-map-json:
-    runs-on: ubuntu-20.04
+    runs-on: macos-latest
     needs: [save-realtime-daily-summary, save-schedule-daily-summary]
     strategy:
       fail-fast: false

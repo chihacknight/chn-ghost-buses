@@ -16,9 +16,11 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+# Changing ubuntu version to 20.04 might resolve some timeout issues
+# See https://github.com/actions/runner-images/issues/6680
 jobs:
   download-cta-schedule-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
@@ -34,52 +36,9 @@ jobs:
           python -c 'from scrape_data.cta_data_downloads import save_cta_zip; \
            save_cta_zip()' \
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-  
-  upload_cta_list:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: 'Upload cta list of zipfiles as an artifact'
-        run: |
-          pip install -r requirements.txt
-          python -c 'from scrape_data.cta_data_downloads import download_cta_files_s3; \
-           download_cta_files_s3()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: s3_data_list
-          path: s3_data_list
-
-  upload_transitfeeds_list:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
-      - name: 'Upload transitfeeds list of zipfiles as an artifact'
-        run: |
-          pip install -r requirements.txt
-          python -c 'from scrape_data.cta_data_downloads import download_transitfeeds_files_s3; \
-          download_transitfeeds_files_s3()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: transitfeeds_data_list
-          path: transitfeeds_data_list
-  
-  
+          
   save-schedule-daily-summary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
@@ -95,9 +54,8 @@ jobs:
           python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
            save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY        
     
-      
   save-realtime-daily-summary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
@@ -116,7 +74,7 @@ jobs:
   
   
   save-frontend-map-json:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [save-realtime-daily-summary, save-schedule-daily-summary]
     strategy:
       fail-fast: false
@@ -127,15 +85,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - uses: actions/download-artifact@v3
-        with:
-          name: transitfeeds_data_list
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: s3_data_list
-
       - name: 'Save data.json for frontend'
+
         run: |
           pip install -r requirements.txt
           

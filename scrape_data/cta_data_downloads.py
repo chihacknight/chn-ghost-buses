@@ -7,10 +7,7 @@ import pendulum
 from io import StringIO, BytesIO
 import pandas as pd
 import typing
-import pickle
-import logging
 
-LOGGER = logging.getLogger(__name__)
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
 
@@ -137,57 +134,30 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
     zip_bytes.seek(0)
     client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
     zipfilesched = sga.zipfile.ZipFile(zip_bytes)
-    LOGGER.info('Extracting data')
     data = sga.GTFSFeed.extract_data(zipfilesched)
-    LOGGER.info('Extraction successful')
     data = sga.format_dates_hours(data)
     return data
 
-def download_cta_files_s3(date_range: typing.List[str] = ['2022-05-20', today]) -> None:
-    _, found_list = find_s3_zipfiles(date_range=date_range)
-    s3_data_list = []
-    for fname in found_list:
-        LOGGER.info(f"Downloading from S3: {fname}")
-        data = download_s3_file(fname)
-        LOGGER.info(f"Successfully downloaded from S3: {fname}")
-        s3_data_list.append({'fname': fname, 'data': data})
-    
-    LOGGER.info(f'Pickling s3_data_list')
-    with open('s3_data_list', 'wb') as fp:
-        pickle.dump(s3_data_list, fp)
-    LOGGER.info(f'Pickling done')
-
-def download_transitfeeds_files_s3(date_range: typing.List[str] = ['2022-05-20', today]) -> None:
-    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
-    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
-    transitfeeds_data_list = []
-    for tfdict in schedule_list_filtered:
-        LOGGER.info(f"Downloading from S3: {tfdict}")
-        version = tfdict['schedule_version']
-        full_name = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
-        tfdata = download_s3_file(full_name)
-        LOGGER.info(f"Successfully downloaded from S3: {tfdict}")
-        transitfeeds_data_list.append({'fname': version, 'data': tfdata})
-    LOGGER.info('Pickling file transitfeeds_data_list')
-    with open('transitfeeds_data_list', 'wb') as fp:
-        pickle.dump(transitfeeds_data_list, fp)
-    LOGGER.info('Pickling successful')
 
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:
+           
     zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
     schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
-            
-    with open('s3_data_list', 'rb') as fp:
-        s3_data_list = pickle.load(fp)
-
-    with open('transitfeeds_data_list', 'rb') as fp:
-        transitfeeds_data_list = pickle.load(fp)
-
-    joined_list = [*s3_data_list, *transitfeeds_data_list]
-
+    # Extract data from s3 zipfiles
+    s3_data_list = []
+    for fname in found_list:
+        data = download_s3_file(fname)
+        s3_data_list.append({'fname': fname, 'data': data})
+    
+    for tfdict in schedule_list_filtered:
+        version = tfdict['schedule_version']
+        full_name = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
+        tfdata = download_s3_file(full_name)
+        s3_data_list.append({'fname': version, 'data': tfdata})
+        
     # Convert from list of dictionaries to dictionary with list values
-    joined_dict = pd.DataFrame(joined_list).to_dict(orient='list')
+    joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
     schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
       for fname, data in joined_dict.items()]
 

@@ -214,7 +214,7 @@ def extract_date(fname: str) -> str:
 
 
 def create_route_summary(CTA_GTFS: sga.GTFSFeed, date_range: typing.List[str]) -> pd.DataFrame:
-    print(f'data is {data}')
+    print(f'Input is {CTA_GTFS}')
     data = sga.GTFSFeed.extract_data(CTA_GTFS)
     data = sga.format_dates_hours(data)
     trip_summary = sga.make_trip_summary(data)

@@ -155,13 +155,16 @@ def compare_realtime_sched(
         s3_data_list.append({'fname': version, 'data': tfdata})
         
     # Convert from list of dictionaries to dictionary with list values
+    print(f's3_data_list is {s3_data_list}')
     joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
-    try:
-        schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
-            for fname, data in joined_dict.items()]
-    except AttributeError:
-        import pdb; pdb.set_trace()
-
+    print(f'Joined dict is {joined_dict}')
+    
+    import sys
+    sys.exit()
+    
+    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
+        for fname, data in joined_dict.items()]
+    
     agg_info = csrt.AggInfo()
     print('Creating combined_long_df and summary_df')
     combined_long_df, summary_df = csrt.combine_real_time_rt_comparison(

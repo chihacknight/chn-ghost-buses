@@ -93,6 +93,3 @@ jobs:
           python -c 'from scrape_data.cta_data_downloads import compare_realtime_sched; \
            compare_realtime_sched()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
       
-      - name: tmate session on error
-        if: failure()
-        uses: mxschmitt/action-tmate@v3

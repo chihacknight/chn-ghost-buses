@@ -159,11 +159,11 @@ def compare_realtime_sched(
     joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
     print(f'Joined dict is {joined_dict}')
     
-    import sys
-    sys.exit()
-    
-    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
-        for fname, data in joined_dict.items()]
+    schedule_data_list = []
+    for elt in s3_data_list:
+        for zipname, zipdata in elt.items():
+            schedule_data_list.append({'schedule_version': zipname, 'data': create_route_summary(zipdata, date_range)})
+
     
     agg_info = csrt.AggInfo()
     print('Creating combined_long_df and summary_df')

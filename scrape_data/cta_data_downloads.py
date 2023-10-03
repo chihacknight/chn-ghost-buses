@@ -134,10 +134,8 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
     zip_bytes.seek(0)
     client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
     zipfilesched = sga.zipfile.ZipFile(zip_bytes)
-    data = sga.GTFSFeed.extract_data(zipfilesched)
-    data = sga.format_dates_hours(data)
-    return data
-
+    return zipfilesched
+    
 
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:

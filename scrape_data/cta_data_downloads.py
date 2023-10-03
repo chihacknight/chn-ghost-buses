@@ -161,8 +161,7 @@ def compare_realtime_sched(
     
     schedule_data_list = []
     for elt in s3_data_list:
-        for zipname, zipdata in elt.items():
-            schedule_data_list.append({'schedule_version': zipname, 'data': create_route_summary(zipdata, date_range)})
+        schedule_data_list.append({'schedule_version': elt['fname'], 'data': create_route_summary(elt['data'], date_range)})
 
     
     agg_info = csrt.AggInfo()

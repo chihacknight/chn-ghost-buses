@@ -156,8 +156,11 @@ def compare_realtime_sched(
         
     # Convert from list of dictionaries to dictionary with list values
     joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
-    schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
-      for fname, data in joined_dict.items()]
+    try:
+        schedule_data_list = [{'schedule_version': fname, 'data': create_route_summary(data, date_range)}
+            for fname, data in joined_dict.items()]
+    except AttributeError:
+        import pdb; pdb.set_trace()
 
     agg_info = csrt.AggInfo()
     print('Creating combined_long_df and summary_df')
@@ -211,6 +214,7 @@ def extract_date(fname: str) -> str:
 
 
 def create_route_summary(CTA_GTFS: sga.GTFSFeed, date_range: typing.List[str]) -> pd.DataFrame:
+    print(f'data is {data}')
     data = sga.GTFSFeed.extract_data(CTA_GTFS)
     data = sga.format_dates_hours(data)
     trip_summary = sga.make_trip_summary(data)

@@ -175,7 +175,8 @@ def compare_realtime_sched(
     day_type = 'wk'
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
     end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
-
+    print(f'Start date is {start_date}')
+    print(f'End date is {end_date}')
     summary_gdf_geo = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type=day_type)
     summary_kwargs = {'column': 'ratio'}
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"

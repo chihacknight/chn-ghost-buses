@@ -1032,8 +1032,8 @@ def save_json(summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name
         save_name (str): name of the json output file
     """
     # Make directory for GitHub actions
-    Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
-    path_name = create_save_path(save_name, DATA_PATH)
+    
+    path_name = create_save_path(save_name, DATA_PATH.parent)
     # Take only the columns related to summary_kwargs['column']
     # and those used in the map
     first_cols = summary_gdf_geo.columns[:2].tolist()
@@ -1059,9 +1059,9 @@ def create_frontend_json(json_file: str, start_date: str, end_date: str, save_pa
         save (bool, optional): Whether to save the JSON output. Defaults to True.
 
     Raises:
-        ValueError: If save is True. The save_path argument cannot be None.
+        ValueError: If save is True, the save_path argument cannot be None.
     """
-    with open(DATA_PATH / json_file) as json_data:
+    with open(DATA_PATH.parent / json_file) as json_data:
         data = json.load(json_data)
         data['dates'] = {'start': start_date, 'end': end_date}
     if save:

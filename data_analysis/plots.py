@@ -1033,7 +1033,7 @@ def save_json(summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name
     """
     # Make directory for GitHub actions
     
-    path_name = create_save_path(save_name, DATA_PATH.parent)
+    path_name = create_save_path(save_name, DATA_PATH)
     # Take only the columns related to summary_kwargs['column']
     # and those used in the map
     first_cols = summary_gdf_geo.columns[:2].tolist()
@@ -1047,30 +1047,29 @@ def save_json(summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name
     summary_gdf_geo[cols].to_html(f"{path_name}_table.html", index=False)
 
 
-def create_frontend_json(json_file: str, start_date: str, end_date: str, save_path: str = None, save: bool = True) -> None:
+def create_frontend_json(json_file: str, start_date: str, end_date: str, save_path: str, save: bool = True) -> None:
     """Create the data.json file that is used for the map at ghostbuses.com
 
     Args:
         json_file (str): name of the json input file
         start_date (str): start date of the data in YYYY-MM-DD format
         end_date (str): end date of the data in YYYY-MM-DD format
-        save_path (str, optional): The path to save the output file. Defaults to None.
-            If save is True, this argument is required.
+        save_path (str): The path to save the output file. 
         save (bool, optional): Whether to save the JSON output. Defaults to True.
 
     Raises:
         ValueError: If save is True, the save_path argument cannot be None.
     """
-    with open(DATA_PATH.parent / json_file) as json_data:
+    json_path = create_save_path(json_file, DATA_PATH)
+    with open(json_path) as json_data:
         data = json.load(json_data)
         data['dates'] = {'start': start_date, 'end': end_date}
     if save:
-        if save_path is None:
-            raise ValueError('You must specify a location to save the json file')
         with open(save_path, 'w') as output_json:
             json.dump(data, output_json)
     else:
         return json.dumps(data, indent=4)
+
 
 def main(day_type: str = None) -> None:
     """Generate maps of all routes, top 10 best routes,

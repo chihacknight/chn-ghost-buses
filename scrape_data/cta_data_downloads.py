@@ -139,7 +139,7 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
 
 def compare_realtime_sched(
         date_range: typing.List[str] = ['2022-05-20', today]) -> None:
-           
+    print(f'--> Date range is {date_range}')       
     zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
     schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
     print(f'--> schedule_list_filtered: {schedule_list_filtered}')
@@ -167,17 +167,20 @@ def compare_realtime_sched(
     
     agg_info = csrt.AggInfo()
     print('Creating combined_long_df and summary_df')
-    combined_long_df, summary_df = csrt.combine_real_time_rt_comparison(
+    combined_long_df, combined_grouped = csrt.combine_real_time_rt_comparison(
         schedule_feeds=schedule_list_filtered,
         schedule_data_list=schedule_data_list,
-        agg_info=agg_info
-    )    
+        agg_info=agg_info,
+    )
+    summary_df = csrt.build_summary(combined_grouped, save=False)    
 
     day_type = 'wk'
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
     end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
     print(f'---> Start date is {start_date}')
     print(f'---> End date is {end_date}')
+    if start_date == end_date:
+        raise ValueError('Start date and end date should be different.')
     summary_gdf_geo = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type=day_type)
     summary_kwargs = {'column': 'ratio'}
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"

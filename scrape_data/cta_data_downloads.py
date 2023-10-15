@@ -162,8 +162,12 @@ def compare_realtime_sched(
     schedule_data_list = []
     for elt in s3_data_list:
         schedule_data_list.append({'schedule_version': elt['fname'], 'data': create_route_summary(elt['data'], date_range)})
+    
+    for sched in schedule_data_list:
+        start_date = sched['data']['date'].min()
+        end_date = sched['date']['date'].max()
+        print(f"Date range is {start_date} to {end_date} for schedule_version {sched['schedule_version']}")
 
-    print(f'--> schedule_data_list is {schedule_data_list}')    
     print('Creating combined_long_df and summary_df')
     combined_long_df, summary_df = csrt.main(schedule_feeds=schedule_list_filtered)
     

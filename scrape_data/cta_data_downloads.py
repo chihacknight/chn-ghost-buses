@@ -165,7 +165,7 @@ def compare_realtime_sched(
     
     for sched in schedule_data_list:
         start_date = sched['data']['date'].min()
-        end_date = sched['date']['date'].max()
+        end_date = sched['data']['date'].max()
         print(f"Date range is {start_date} to {end_date} for schedule_version {sched['schedule_version']}")
 
     print('Creating combined_long_df and summary_df')

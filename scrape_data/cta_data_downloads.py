@@ -158,23 +158,17 @@ def compare_realtime_sched(
     # Convert from list of dictionaries to dictionary with list values
     print(f's3_data_list is {s3_data_list}')
     joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
-    print(f'Joined dict is {joined_dict}')
     
     schedule_data_list = []
     for elt in s3_data_list:
         schedule_data_list.append({'schedule_version': elt['fname'], 'data': create_route_summary(elt['data'], date_range)})
 
-    
-    agg_info = csrt.AggInfo()
+    print(f'--> schedule_data_list is {schedule_data_list}')    
     print('Creating combined_long_df and summary_df')
-    combined_long_df, combined_grouped = csrt.combine_real_time_rt_comparison(
-        schedule_feeds=schedule_list_filtered,
-        schedule_data_list=schedule_data_list,
-        agg_info=agg_info,
-    )
-    summary_df = csrt.build_summary(combined_grouped, save=False)    
-
+    combined_long_df, summary_df = csrt.main(schedule_feeds=schedule_list_filtered)
+    
     day_type = 'wk'
+    combined_long_df = plots.filter_day_type(combined_long_df, day_type=day_type)
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
     end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
     print(f'---> Start date is {start_date}')

@@ -16,7 +16,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-# Changing ubuntu version to 20.04 might resolve some timeout issues
+# Changing ubuntu to macos might resolve some timeout issues
 # See https://github.com/actions/runner-images/issues/6680
 jobs:
   download-cta-schedule-data:

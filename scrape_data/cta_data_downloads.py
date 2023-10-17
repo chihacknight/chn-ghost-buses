@@ -196,6 +196,7 @@ def compare_realtime_sched(
         json_file=f'{save_name}.json',
         start_date=start_date,
         end_date=end_date,
+        save_path=s3_data_json_path,
         save=False
     )
     # Save data.json to s3 for now. This will eventually live in the frontend repo.

@@ -7,6 +7,7 @@ import pendulum
 from io import StringIO, BytesIO
 import pandas as pd
 import typing
+import update_data
 
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
@@ -135,60 +136,26 @@ def download_s3_file(fname: str) -> sga.GTFSFeed:
     client.download_fileobj(Bucket=sga.BUCKET, Key=fname, Fileobj=zip_bytes)
     zipfilesched = sga.zipfile.ZipFile(zip_bytes)
     return zipfilesched
-    
 
-def compare_realtime_sched(
-        date_range: typing.List[str] = ['2022-05-20', today]) -> None:
-    print(f'--> Date range is {date_range}')       
-    zip_filename_list, found_list = find_s3_zipfiles(date_range=date_range)
-    schedule_list_filtered = find_transitfeeds_zipfiles(zip_filename_list, found_list)
-    print(f'--> schedule_list_filtered: {schedule_list_filtered}')
-    # Extract data from s3 zipfiles
-    s3_data_list = []
-    for fname in found_list:
-        data = download_s3_file(fname)
-        s3_data_list.append({'fname': fname, 'data': data})
+def compare_realtime_sched() -> None:
     
-    for tfdict in schedule_list_filtered:
-        version = tfdict['schedule_version']
-        full_name = f"transitfeeds_schedule_zipfiles_raw/{version}.zip"
-        tfdata = download_s3_file(full_name)
-        s3_data_list.append({'fname': version, 'data': tfdata})
-        
-    # Convert from list of dictionaries to dictionary with list values
-    print(f's3_data_list is {s3_data_list}')
-    joined_dict = pd.DataFrame(s3_data_list).to_dict(orient='list')
-    
-    schedule_data_list = []
-    for elt in s3_data_list:
-        schedule_data_list.append({'schedule_version': elt['fname'], 'data': create_route_summary(elt['data'], date_range)})
-    
-    for sched in schedule_data_list:
-        start_date = sched['data']['date'].min()
-        end_date = sched['data']['date'].max()
-        print(f"Date range is {start_date} to {end_date} for schedule_version {sched['schedule_version']}")
-
     print('Creating combined_long_df and summary_df')
-    combined_long_df, summary_df = csrt.main(schedule_feeds=schedule_list_filtered)
+    combined_long_df, summary_df = csrt.main()
     
-    day_type = 'wk'
-    combined_long_df = plots.filter_day_type(combined_long_df, day_type=day_type)
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
     end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
-    print(f'---> Start date is {start_date}')
-    print(f'---> End date is {end_date}')
-    if start_date == end_date:
-        raise ValueError('Start date and end date should be different.')
-    summary_gdf_geo = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type=day_type)
-    summary_kwargs = {'column': 'ratio'}
+    
+    data_update = update_data.DataUpdate(
+        combined_long_df=combined_long_df, 
+        summary_df=summary_df, 
+        start_date=start_date, 
+        end_date=end_date
+    )
+    update_data.update_interactive_map_data(data_update)
+    day_type = 'wk'
+    
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
 
-    plots.save_json(
-        summary_gdf_geo=summary_gdf_geo, 
-        summary_kwargs=summary_kwargs,
-        save_name=save_name
-    )
-    
     s3_data_json_path = 'frontend_data_files/data.json'
     print(f'Saving data.json to {s3_data_json_path}')
 
@@ -205,7 +172,23 @@ def compare_realtime_sched(
         f'{s3_data_json_path}')\
         .put(Body=data_json)
 
-    _ = keys(csrt.BUCKET_PUBLIC, ['data.json'])
+    _ = keys(csrt.BUCKET_PUBLIC, [s3_data_json_path])
+
+    # Create and save json for lineplots
+    lineplots_path_name = 'schedule_vs_realtime_all_day_types_routes'
+    s3_schedule_vs_realtime_path = f'frontend_data_files/{lineplots_path_name}.json'
+    
+    update_data.update_lineplot_data(data_update)
+    with open(plots.DATA_PATH / f"{lineplots_path_name}_{start_date}_to_{end_date}.json") as json_data:
+        lineplot_json = plots.json.load(json_data)
+    
+    print(f'Saving {s3_schedule_vs_realtime_path}')
+    s3.Object(
+        csrt.BUCKET_PUBLIC,
+        f'{s3_schedule_vs_realtime_path}')\
+        .put(Body=lineplot_json)
+
+    _ = keys(csrt.BUCKET_PUBLIC, [s3_schedule_vs_realtime_path])
 
 
 def confirm_saved_files(file_dict: dict) -> None:

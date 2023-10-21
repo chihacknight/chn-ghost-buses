@@ -151,6 +151,9 @@ def compare_realtime_sched() -> None:
         start_date=start_date, 
         end_date=end_date
     )
+    # Create directory on the GitHub Action runner.
+    plots.Path(plots.DATA_PATH).mkdir(parents=True, exist_ok=True)
+
     update_data.update_interactive_map_data(data_update)
     day_type = 'wk'
     

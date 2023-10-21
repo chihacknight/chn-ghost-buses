@@ -1032,7 +1032,6 @@ def save_json(summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name
         save_name (str): name of the json output file
     """
     # Make directory for GitHub actions
-    Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
     path_name = create_save_path(save_name, DATA_PATH)
     # Take only the columns related to summary_kwargs['column']
     # and those used in the map

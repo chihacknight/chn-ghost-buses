@@ -315,10 +315,21 @@ def build_summary(
     return summary
 
     
-def create_GTFS_data_list(schedule_feeds: List[dict] = None) -> dict:
-    if schedule_feeds is None:
-        schedule_feeds = create_schedule_list(month=5, year=2022)
+def create_GTFS_data_list(schedule_feeds: List[dict]) -> dict:
+    """ Create list of GTFS data for each schedule version
 
+    Args:
+        schedule_feeds (List[dict]): List of dictionaries with the keys
+            'schedule_version', 'feed_start_date', and 'feed_end_date'.
+
+    Returns:
+        dict: A dictionary with keys 'GTFS_data_list' and 'schedule_data_list'.
+            'GTFS_data_list' is a list of dictionaries with the keys 'schedule_version'
+            and 'data', which is the extracted data from the GTFS zip file.
+            'schedule_data_list' is a list of dictionaries with the same keys as 'GTFS_data_list', 
+            except that 'data' here is the route_daily_summary.
+    """
+    
     GTFS_data_list = []
     schedule_data_list = []
     pbar = tqdm(schedule_feeds)
@@ -384,6 +395,9 @@ def main(freq: str = 'D', schedule_feeds: List[dict] = None
         pd.DataFrame: A DataFrame summary across
             versioned schedule comparisons.
     """
+    if schedule_feeds is None:
+        schedule_feeds = create_schedule_list(month=5, year=2022)
+
     schedule_data_list = create_GTFS_data_list(schedule_feeds)['schedule_data_list']
     
     agg_info = AggInfo(freq=freq)

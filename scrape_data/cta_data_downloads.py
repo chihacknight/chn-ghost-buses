@@ -141,7 +141,10 @@ def compare_realtime_sched() -> None:
     
     print('Creating combined_long_df and summary_df')
     combined_long_df, summary_df = csrt.main()
-    
+    combined_long_df.loc[:, "ratio"] = (
+        combined_long_df.loc[:, "trip_count_rt"]
+        / combined_long_df.loc[:, "trip_count_sched"]
+    )
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
     end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
     

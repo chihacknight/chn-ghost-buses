@@ -182,7 +182,8 @@ def compare_realtime_sched() -> None:
     s3_schedule_vs_realtime_path = f'frontend_data_files/{lineplots_path_name}.json'
     
     update_data.update_lineplot_data(data_update)
-    with open(plots.DATA_PATH / f"{lineplots_path_name}_{start_date}_to_{end_date}.json") as json_data:
+    lineplot_json_file = plots.create_save_path(lineplots_path_name, plots.DATA_PATH)
+    with open(f"{lineplot_json_file}.json") as json_data:
         lineplot_json = plots.json.load(json_data)
     
     print(f'Saving {s3_schedule_vs_realtime_path}')

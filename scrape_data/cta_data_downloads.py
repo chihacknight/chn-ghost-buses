@@ -160,7 +160,6 @@ def compare_realtime_sched() -> None:
     save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
 
     s3_data_json_path = 'frontend_data_files/data.json'
-    print(f'Saving data.json to {s3_data_json_path}')
 
     data_json = plots.create_frontend_json(
         json_file=f'{save_name}',
@@ -170,6 +169,7 @@ def compare_realtime_sched() -> None:
         save=False
     )
     # Save data.json to s3 for now. This will eventually live in the frontend repo.
+    print(f'Saving {s3_data_json_path}')
     s3.Object(
         csrt.BUCKET_PUBLIC,
         f'{s3_data_json_path}')\

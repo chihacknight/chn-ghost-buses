@@ -170,9 +170,9 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     # JSON files for frontend interactive map by day type
     for day_type in plots.DAY_NAMES.keys():
         summary_df_mean_day = plots.filter_day_type(summary_df_mean, day_type=day_type)
-        save_path = (
-            plots.DATA_PATH / f"all_routes_{start_date}_to_{end_date}_{day_type}"
-        )
+        save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
+        save_path = plots.create_save_path(save_name, dir_name=plots.DATA_PATH)
+        print(f'--> Saving {save_path}')
         summary_df_mean_day.to_json(
             f"{save_path}.json", date_format="iso", orient="records"
         )

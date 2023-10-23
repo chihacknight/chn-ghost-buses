@@ -163,7 +163,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
         plots.DATA_PATH
     )
     combined_long_df[json_cols].to_json(
-        all_day_types_path,
+        f"{all_day_types_path}.json",
         date_format="iso",
         orient="records",
     )
@@ -172,7 +172,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     wk_path = plots.create_save_path("schedule_vs_realtime_wk_routes"
         f"_{start_date}_to_{end_date}", plots.DATA_PATH)
     combined_long_df_wk[json_cols].to_json(
-        wk_path,
+        f"{wk_path}.json",
         date_format="iso",
         orient="records",
     )
@@ -185,7 +185,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
         plots.DATA_PATH
     )
     combined_long_groupby_date[json_cols].to_json(
-        all_day_types_overall_path,
+        f"{all_day_types_overall_path}.json",
         date_format="iso",
         orient="records",
     )
@@ -197,7 +197,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
         plots.DATA_PATH
     )
     combined_long_groupby_date_wk[json_cols].to_json(
-        wk_overall_path,
+        f"{wk_overall_path}.json",
         date_format="iso",
         orient="records",
     )

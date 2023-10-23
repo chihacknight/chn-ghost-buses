@@ -165,7 +165,7 @@ def compare_realtime_sched() -> None:
     s3_data_json_path = 'frontend_data_files/data.json'
 
     data_json = plots.create_frontend_json(
-        json_file=f'{save_name}',
+        json_file=save_name,
         start_date=start_date,
         end_date=end_date,
         save_path=s3_data_json_path,

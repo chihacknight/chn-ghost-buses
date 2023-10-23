@@ -181,8 +181,9 @@ def compare_realtime_sched() -> None:
     _ = keys(csrt.BUCKET_PUBLIC, [s3_data_json_path])
 
     # Create and save json for lineplots
-    lineplots_path_name = f'schedule_vs_realtime_all_day_types_routes_{start_date}_to_{end_date}'
-    s3_schedule_vs_realtime_path = f'frontend_data_files/{lineplots_path_name}.json'
+    lineplots_download_name = 'schedule_vs_realtime_all_day_types_routes'
+    lineplots_path_name = f'{lineplots_download_name}_{start_date}_to_{end_date}'
+    s3_schedule_vs_realtime_path = f'frontend_data_files/{lineplots_download_name}.json'
     
     update_data.update_lineplot_data(data_update)
     lineplot_json_file = plots.create_save_path(lineplots_path_name, plots.DATA_PATH)

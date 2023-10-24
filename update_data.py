@@ -156,6 +156,8 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     start_date = data_update.start_date
     end_date = data_update.end_date
 
+    # Remove the datetime.
+    combined_long_df.loc[:, 'date'] = combined_long_df.loc[:, 'date'].dt.strftime('%Y-%m-%d')
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]
     all_day_types_path = plots.create_save_path(

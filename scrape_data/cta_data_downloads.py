@@ -194,7 +194,7 @@ def compare_realtime_sched() -> None:
     s3.Object(
         csrt.BUCKET_PUBLIC,
         f'{s3_schedule_vs_realtime_path}')\
-        .put(Body=lineplot_json)
+        .put(Body=bytes(plots.json.dumps(lineplot_json, default=str).encode()))
 
     _ = keys(csrt.BUCKET_PUBLIC, [s3_schedule_vs_realtime_path])
 

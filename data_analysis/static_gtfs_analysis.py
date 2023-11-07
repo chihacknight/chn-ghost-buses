@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List
+from typing import Tuple
 
 import logging
 import calendar
@@ -38,7 +38,6 @@ logging.basicConfig(
     datefmt='%m/%d/%Y %I:%M:%S %p'
 )
 
-
 @dataclass
 class GTFSFeed:
     """Class for storing GTFSFeed data.
@@ -53,14 +52,14 @@ class GTFSFeed:
 
     @classmethod
     def extract_data(cls, gtfs_zipfile: zipfile.ZipFile,
-                     version_id: str = None) -> GTFSFeed:
+                     version_id: str = None, cta_download: bool = True) -> GTFSFeed:
         """Load each text file in zipfile into a DataFrame
 
         Args:
             gtfs_zipfile (zipfile.ZipFile): Zipfile downloaded from
-                CTA transit feeds e.g.
+                transitfeeds.com or transitchicago.com e.g.
                 https://transitfeeds.com/p/chicago-transit-authority/
-                165/20220718/download"
+                165/20220718/download or https://www.transitchicago.com/downloads/sch_data/
             version_id (str, optional): The schedule version in use.
                 Defaults to None.
 
@@ -68,9 +67,17 @@ class GTFSFeed:
             GTFSFeed: A GTFSFeed object containing multiple DataFrames
                 accessible by name.
         """
-        if version_id is None:
-            version_id = VERSION_ID
-        logging.info(f"Extracting data from CTA zipfile version {version_id}")
+        if cta_download:
+            if version_id is not None:
+                raise ValueError("version_id is not used for downloads directly from CTA")
+            else:
+                logging.info(f"Extracting data from transitchicago.com zipfile")
+        
+        else:
+            if version_id is None:
+                version_id = VERSION_ID
+            logging.info(f"Extracting data from transitfeeds.com zipfile version {version_id}")
+
         data_dict = {}
         pbar = tqdm(cls.__annotations__.keys())
         for txt_file in pbar:
@@ -140,14 +147,16 @@ def format_dates_hours(data: GTFSFeed) -> GTFSFeed:
 
 def make_trip_summary(
     data: GTFSFeed,
-    feed_start_date: pendulum.datetime,
-        feed_end_date: pendulum.datetime) -> pd.DataFrame:
+    feed_start_date: pendulum.datetime = None,
+        feed_end_date: pendulum.datetime = None) -> pd.DataFrame:
     """Create a summary of trips with one row per date
 
     Args:
         data (GTFSFeed): GTFS data from CTA
-        feed_start_date (datetime): Date from which this feed is valid (inclusive)
-        feed_end_date (datetime): Date until which this feed is valid (inclusive)
+        feed_start_date (datetime): Date from which this feed is valid (inclusive).
+            Defaults to None
+        feed_end_date (datetime): Date until which this feed is valid (inclusive).
+            Defaults to None
 
     Returns:
         pd.DataFrame: A DataFrame with each trip that occurred per row.
@@ -161,7 +170,7 @@ def make_trip_summary(
         ),
         columns=["raw_date"],
     )
-
+     
     # cross join calendar index with actual calendar to get all combos of
     # possible dates & services
     calendar_cross = calendar_date_range.merge(data.calendar, how="cross")
@@ -244,9 +253,10 @@ def make_trip_summary(
         trip_stop_hours, how="left", on="trip_id")
 
     # filter to only the rows for the period where this specific feed version was in effect
-    trip_summary = trip_summary.loc[
-        (trip_summary['raw_date'] >= feed_start_date)
-        & (trip_summary['raw_date'] <= feed_end_date), :]
+    if feed_start_date is not None and feed_end_date is not None:
+        trip_summary = trip_summary.loc[
+            (trip_summary['raw_date'] >= feed_start_date)
+            & (trip_summary['raw_date'] <= feed_end_date), :]
 
     return trip_summary
 
@@ -321,6 +331,23 @@ def make_linestring_of_points(
     return shapely.geometry.LineString(list(sorted_df["pt"]))
 
 
+def download_cta_zip() -> Tuple[zipfile.ZipFile, BytesIO]:
+    """Download CTA schedule data from transitchicago.com
+
+    Returns:
+        zipfile.ZipFile: A zipfile of the latest GTFS schedule data from transitchicago.com
+    """
+    logger.info('Downloading CTA data')
+    zip_bytes_io = BytesIO(
+            requests.get("https://www.transitchicago.com/downloads/sch_data/google_transit.zip"
+            ).content
+        )
+    CTA_GTFS = zipfile.ZipFile(zip_bytes_io)
+    logging.info('Download complete')
+    return CTA_GTFS, zip_bytes_io
+ 
+
+
 def download_zip(version_id: str) -> zipfile.ZipFile:
     """Download a version schedule from transitfeeds.com
 
@@ -344,17 +371,22 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
     return CTA_GTFS
 
 
-def download_extract_format(version_id: str) -> GTFSFeed:
+def download_extract_format(version_id: str = None) -> GTFSFeed:
     """Download a zipfile of GTFS data for a given version_id,
         extract data, and format date column.
 
     Args:
-        version_id (str): The version of the GTFS schedule data to download
+        version_id (str): The version of the GTFS schedule data to download. Defaults to None
+            If version_id is None, data will be downloaded from the CTA directly (transitchicag.com)
+            instead of transitfeeds.com
 
     Returns:
         GTFSFeed: A GTFSFeed object with formated dates
     """
-    CTA_GTFS = download_zip(version_id)
+    if version_id is None:
+        CTA_GTFS, _ = download_cta_zip()
+    else:
+        CTA_GTFS = download_zip(version_id)
     data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
     data = format_dates_hours(data)
     return data

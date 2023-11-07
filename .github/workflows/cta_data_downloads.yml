@@ -1,0 +1,68 @@
+name: Automate CTA schedule and realtime downloads
+
+on:
+
+  schedule:
+    # Run every day at 12:30pm CST which is 5:30pm UTC
+    - cron: 30 17 * * * 
+
+env: 
+  PYTHON_VERSION: 3.10.6
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  download-cta-schedule-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+        
+      - name: Download and save CTA schedule data
+
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import save_cta_zip; \
+           save_cta_zip()' \
+           $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+   
+          
+  # save-schedule-daily-summary:
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
+      
+  #     - name: 'Save schedule summaries'
+  #       run: |
+  #         pip install -r requirements.txt
+  #         python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
+  #          save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+    
+      
+  # save-realtime-daily-summary:
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
+      
+  #     - name: 'Save realtime summaries'
+
+  #       run: |
+  #         pip install -r requirements.txt
+          
+  #         python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \
+  #          save_realtime_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+    

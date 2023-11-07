@@ -5,6 +5,7 @@ venv
 .venv
 .vscode
 .env
+.idea/
 
 # ignore files in scratch subfolder in plots and data_output folders
 !data_output/scratch/*

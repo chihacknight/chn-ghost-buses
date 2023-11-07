@@ -5,7 +5,7 @@ import data_analysis.compare_scheduled_and_rt as csrt
 import pendulum
 from io import StringIO
 import pandas as pd
-
+import botocore
 
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
@@ -89,11 +89,17 @@ def save_realtime_daily_summary() -> None:
     
     end_date = end_date.to_date_string()
 
-    daily_data = pd.read_csv(
+    try:
+        daily_data = pd.read_csv(
                 (csrt.BASE_PATH / f"bus_full_day_data_v2/{end_date}.csv")
                 .as_uri(),
                 low_memory=False
             )
+    except (botocore.exceptions.ConnectTimeoutError, botocore.exceptions.EndpointConnectionError):
+        daily_data = pd.read_csv(
+            f'https://{csrt.BUCKET_PUBLIC}.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/{end_date}.csv',
+            low_memory=False
+        )
 
     daily_data = csrt.make_daily_summary(daily_data)
     filename = f'realtime_summaries/daily_job/bus_full_day_data_v2/{end_date}.csv'

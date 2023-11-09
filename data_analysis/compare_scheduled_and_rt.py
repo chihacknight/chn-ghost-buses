@@ -11,10 +11,10 @@ import pandas as pd
 import pendulum
 from tqdm import tqdm
 from dotenv import load_dotenv
-import botocore
 
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
 from scrape_data.scrape_schedule_versions import create_schedule_list
+from utils import s3_csv_reader
 
 load_dotenv()
 
@@ -232,20 +232,7 @@ def combine_real_time_rt_comparison(
                 f"{pendulum.now().to_datetime_string()}"
             )
 
-            # Use low_memory option to avoid warning about columns
-            # with mixed dtypes.
-            try:
-                daily_data = pd.read_csv(
-                    (BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
-                    .as_uri(),
-                    low_memory=False
-                )
-            except (botocore.exceptions.ConnectTimeoutError, botocore.exceptions.EndpointConnectionError):
-                daily_data = pd.read_csv(
-                    f'https://{BUCKET_PUBLIC}.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/{date_str}.csv',
-                    low_memory=False
-                )
-
+            daily_data = s3_csv_reader.read_csv(BASE_PATH / f"bus_full_day_data_v2/{date_str}.csv")
             daily_data = make_daily_summary(daily_data)
 
             rt_raw = pd.concat([rt_raw, daily_data])
@@ -352,7 +339,8 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
         logger.info("\nExtracting data")
         data = static_gtfs_analysis.GTFSFeed.extract_data(
             CTA_GTFS,
-            version_id=schedule_version
+            version_id=schedule_version,
+            cta_download=False
         )
         data = static_gtfs_analysis.format_dates_hours(data)
 

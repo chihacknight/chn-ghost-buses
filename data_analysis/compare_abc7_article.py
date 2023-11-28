@@ -1,16 +1,12 @@
 # compare the numbers in the abc 7 article to our numbers
 # https://abc7chicago.com/cta-bus-tracker-app-estimated-arrival-times-chicago/13995684/
 import pandas as pd
-import data_analysis.plots as plots
-
-num_cancelled_trips = 3600000
-num_cancelled_trips_aug_2023 = 4937
-num_cancelled_trips_aug_2022 = 27477
+import data_analysis.compare_scheduled_and_rt as csrt
 
 abc7_dict = {
-    'num_cancelled_trips': num_cancelled_trips,
-    'num_cancelled_trips_aug_2022': num_cancelled_trips_aug_2022,
-    'num_cancelled_trips_aug_2023': num_cancelled_trips_aug_2023
+    'num_cancelled_trips': 360000,
+    'num_cancelled_trips_aug_2022': 27477,
+    'num_cancelled_trips_aug_2023': 4937
 }
 
 def compare_numbers(combined_long_df: pd.DataFrame, summary_df: pd.DataFrame) -> None:
@@ -40,7 +36,7 @@ def compare_numbers(combined_long_df: pd.DataFrame, summary_df: pd.DataFrame) ->
             4      103      hol            475               552  0.860507
     """
     num_cancelled_trips_ours = summary_df['trip_count_sched'].sum() - summary_df['trip_count_rt'].sum()    
-    print(f'Article number of cancelled trips {num_cancelled_trips}'
+    print(f'Article number of cancelled trips {abc7_dict["num_cancelled_trips"]}'
           f'\nOur number of cancelled trips: {num_cancelled_trips_ours}')
     combined_long_df['date'] = pd.to_datetime(combined_long_df['date'])
     aug_dict = {}
@@ -55,23 +51,21 @@ def compare_numbers(combined_long_df: pd.DataFrame, summary_df: pd.DataFrame) ->
         )
         print(f'\nArticle number cancelled trips in August {year}: ' f'{abc7_dict[f"num_cancelled_trips_aug_{year}"]}')
         print(f'Our number of cancelled trips in August {year}: ' f'{aug_dict[f"num_cancelled_trips_aug_{year}_ours"]}')
-    
-    summary_df['cancelled_trips'] = summary_df['trip_count_sched'] - summary_df['trip_count_rt']
-    
+     
     # Test routes in article
+    summary_df['cancelled_trips'] = summary_df['trip_count_sched'] - summary_df['trip_count_rt']
     route_list = ['49', '49X', '22', '9', '9X', '63']
     rankings = summary_df.groupby('route_id').sum()['cancelled_trips'].rank(ascending=False)
     for route_id in route_list:
         route_id_ranking = rankings[rankings.index == route_id]
         if route_id_ranking.empty:
-            print(f'route {route_id} does not exist our data')
+            print(f'\nroute {route_id} does not exist our data')
             continue
-        print(f'route {route_id} is ranked {rankings[rankings.index == route_id][0]} for number of canceled trips')
+        print(f'\nroute {route_id} is ranked {route_id_ranking[0]} for number of canceled trips')
 
 
 def main() -> None:
-    summary_df = pd.read_csv(plots.DATA_PATH / 'summary_df_2023-08-30.csv')
-    combined_long_df = pd.read_csv(plots.DATA_PATH / 'combined_long_df_2023-08-30.csv')
+    combined_long_df, summary_df = csrt.combine_real_time_rt_comparison()
     compare_numbers(summary_df, combined_long_df)
 
 

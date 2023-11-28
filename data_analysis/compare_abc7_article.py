@@ -59,7 +59,7 @@ def compare_numbers(combined_long_df: pd.DataFrame, summary_df: pd.DataFrame) ->
     for route_id in route_list:
         route_id_ranking = rankings[rankings.index == route_id]
         if route_id_ranking.empty:
-            print(f'\nroute {route_id} does not exist our data')
+            print(f'\nroute {route_id} does not exist in our data')
             continue
         print(f'\nroute {route_id} is ranked {route_id_ranking[0]} for number of canceled trips')
 

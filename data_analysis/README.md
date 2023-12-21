@@ -15,11 +15,11 @@ Data in the public `chn-ghost-buses-public` bucket is publicly accessible for re
 
 The data can be accessed several ways. To access an individual file, you can:
 
-* Go directly to the URL for a resource in your browser to download the file locally. URLs follow the form `https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/{path_to_specific_file_as_described below}`; for example: `https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/2022-10-01.csv`. 
+* Go directly to the URL for a resource in your browser to download the file locally. URLs follow the form `https://dmu5hq5f7fk32.cloudfront.net/{path_to_specific_file_as_described below}`; for example: `https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv`. 
 
-* Use standard request libraries and packages. For example, you can use [wget](https://www.gnu.org/software/wget/manual/) like `wget https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/2022-10-01.csv` (see above for notes on the URL format/construction).
+* Use standard request libraries and packages. For example, you can use [wget](https://www.gnu.org/software/wget/manual/) like `wget https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv` (see above for notes on the URL format/construction).
 
-* Use Pandas, which recognizes `s3` file URIs if you install the `s3fs` dependency. So, for example, you can use: `pandas.read_csv('s3://chn-ghost-buses-public/bus_full_day_data_v2/2022-10-01.csv')` to load a file as a Pandas dataframe. *Note: Some members of the breakout group have experienced challenges accessing the data in this way; you can also use a full URL as described in the first bullet to load data into Pandas like: `pandas.read_csv('https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/2022-10-01.csv')`.*
+* Use Pandas, which recognizes `s3` file URIs if you install the `s3fs` dependency. So, for example, you can use: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')` to load a file as a Pandas dataframe. *Note: Some members of the breakout group have experienced challenges accessing the data in this way; you can also use a full URL as described in the first bullet to load data into Pandas like: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')`.*
 
 ## Available data
 
@@ -33,11 +33,11 @@ There are a few types of data available in the public S3 bucket. The **data** li
             * `data_hour`: The hour extracted from the `data_time` (integer between 0 and 23).
             * `data_date`: The date extracted from the `data_time`.
         * These files are generated daily between 10 and 11am Central for the prior day. There is one file per full day from `2022-05-20` until the day before you are making the request. So, if you are checking on `2022-10-02` after 11am Central, data will be available up to and including `2022-10-01`.
-        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_data_v2`. Full filenames are like `bus_full_day_data_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_data_v2/2022-10-01.csv')`.
+        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_data_v2`. Full filenames are like `bus_full_day_data_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')`.
     * **Errors**: 
         * These are CSV files that contain all the error data we received from the API, concatenated together for a full day. The schema of the data is exactly what is returned from the API, with only a `scrape_file` field (see above) added that records the name of the S3 resource where the original JSON response that contained this row is saved; see [the `getvehicles` section of the CTA documentation]('https://www.transitchicago.com/assets/1/6/cta_Bus_Tracker_API_Developer_Guide_and_Documentation_20160929.pdf') for field definitions from the API.
         * These files are generated daily between 10 and 11am Central for the prior day. There is one file per full day from `2022-05-20` until the day before you are making the request. So, if you are checking on `2022-10-02` after 11am Central, errors will be available up to and including `2022-10-01`.
-        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_errors_v2`. Full filenames are like `bus_full_day_errors_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://chn-ghost-buses-public.s3.us-east-2.amazonaws.com/bus_full_day_errors_v2/2022-10-01.csv')`.
+        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_errors_v2`. Full filenames are like `bus_full_day_errors_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_errors_v2/2022-10-01.csv')`.
 
 
     ## Script to load data
@@ -45,7 +45,6 @@ There are a few types of data available in the public S3 bucket. The **data** li
     The following code will work to load all available data. To change the date range, enter the `START_DATE` and `END_DATE` parameters in `YYYY-MM-DD` format. Note that one day of weekday data is about 28 MB. The script can take some time to run depending on how many days you are loading. 
 
     ```
-    BUCKET = "public"
     START_DATE = "2022-05-20"
     END_DATE = ""
 
@@ -53,7 +52,7 @@ There are a few types of data available in the public S3 bucket. The **data** li
     import pandas as pd
 
 
-    BUCKET_URL = f"https://chn-ghost-buses-{BUCKET}.s3.us-east-2.amazonaws.com"
+    BUCKET_URL = "https://dmu5hq5f7fk32.cloudfront.net"
 
     start_date = pendulum.from_format(START_DATE, 'YYYY-MM-DD', tz = "America/Chicago")
 

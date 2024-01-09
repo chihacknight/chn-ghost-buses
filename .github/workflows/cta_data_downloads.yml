@@ -1,6 +1,7 @@
 name: Automate CTA schedule and realtime downloads
 
 on:
+  workflow_dispatch:
   push:
     branches:
     - 'automate-schedule-downloads'

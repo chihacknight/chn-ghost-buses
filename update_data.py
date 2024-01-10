@@ -121,15 +121,14 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     summary_df = data_update.summary_df.copy()
     start_date = data_update.start_date
     end_date = data_update.end_date
-    summary_gdf_geo = plots.create_summary_gdf_geo(combined_long_df, summary_df)
 
 
     # JSON files for frontend interactive map by day type
     summary_kwargs = {'column': 'ratio'}
     for day_type in plots.DAY_NAMES.keys():
-        summary_df_mean_day = plots.filter_day_type(summary_gdf_geo, day_type=day_type)
+        summary_gdf_geo_day = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type='wk')
         save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
-        plots.save_json(summary_df_mean_day, summary_kwargs=summary_kwargs, save_name=save_name)
+        plots.save_json(summary_gdf_geo_day, summary_kwargs=summary_kwargs, save_name=save_name)
         
 
 def update_lineplot_data(data_update: DataUpdate) -> None:

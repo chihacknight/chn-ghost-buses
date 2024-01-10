@@ -1,0 +1,38 @@
+name: Download transitfeeds.com zipfiles and save to s3
+
+on: 
+    workflow_dispatch:
+        inputs:
+            start_date:
+                description: 'Start date in YYYY-MM-DD format'
+                required: false
+                type: string
+            end_date:
+                description: 'End date in YYYY-MM-DD format e.g. 2023-05-20'
+                required: false
+                type: string
+
+env: 
+  PYTHON_VERSION: 3.10.6
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  save-transitfeeds-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+        
+      - name: Download and save transitfeeds.com schedule data
+
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import save_transitfeeds_zip; \
+          save_transitfeeds_zip(start_date=${{ inputs.start_date }}, end_date=${{ inputs.end_date}})' \
+          $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+

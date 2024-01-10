@@ -1,6 +1,12 @@
 name: Automate CTA schedule and realtime downloads
 
 on:
+  workflow_dispatch:
+  push:
+    branches:
+    - 'automate-schedule-downloads'
+    - 'date-range-downloads'
+    - 'compare-realtime-schedule'
 
   schedule:
     # Run every day at 12:30pm CST which is 5:30pm UTC
@@ -11,9 +17,11 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+# Changing ubuntu to macos might resolve some timeout issues
+# See https://github.com/actions/runner-images/issues/6680
 jobs:
   download-cta-schedule-data:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -29,40 +37,60 @@ jobs:
           python -c 'from scrape_data.cta_data_downloads import save_cta_zip; \
            save_cta_zip()' \
            $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-   
           
-  # save-schedule-daily-summary:
-  #   runs-on: ubuntu-latest
+  save-schedule-daily-summary:
+    runs-on: macos-latest
 
-  #   steps:
-  #     - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       
-  #     - name: 'Save schedule summaries'
-  #       run: |
-  #         pip install -r requirements.txt
-  #         python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
-  #          save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+      - name: 'Save schedule summaries'
+      # Test with no date and with date range
+        run: |
+          pip install -r requirements.txt
+          python -c 'from scrape_data.cta_data_downloads import save_sched_daily_summary; \
+           save_sched_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY        
     
+  save-realtime-daily-summary:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       
-  # save-realtime-daily-summary:
-  #   runs-on: ubuntu-latest
+      - name: 'Save realtime summaries'
 
-  #   steps:
-  #     - uses: actions/checkout@v3
-
-  #     - uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ env.PYTHON_VERSION }}
-      
-  #     - name: 'Save realtime summaries'
-
-  #       run: |
-  #         pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
           
-  #         python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \
-  #          save_realtime_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
-    
+          python -c 'from scrape_data.cta_data_downloads import save_realtime_daily_summary; \
+           save_realtime_daily_summary()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+  
+  
+  save-frontend-map-json:
+    runs-on: macos-latest
+    needs: [save-realtime-daily-summary, save-schedule-daily-summary]
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 'Save data.json for frontend'
+
+        run: |
+          pip install -r requirements.txt
+          
+          python -c 'from scrape_data.cta_data_downloads import compare_realtime_sched; \
+           compare_realtime_sched()' $AWS_ACCESS_KEY_ID $AWS_SECRET_ACCESS_KEY
+      

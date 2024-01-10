@@ -314,24 +314,33 @@ def build_summary(
         )
     return summary
 
-
-def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
-    """Calculate the summary by route and day across multiple schedule versions
+    
+def create_GTFS_data_list(schedule_feeds: List[dict]) -> dict:
+    """ Create list of GTFS data for each schedule version
 
     Args:
-        freq (str): Frequency of aggregation. Defaults to Daily.
-    Returns:
-        pd.DataFrame: A DataFrame of every day in the specified data with
-        scheduled and observed count of trips.
-        pd.DataFrame: A DataFrame summary across
-            versioned schedule comparisons.
-    """
-    schedule_feeds = create_schedule_list(month=5, year=2022)
+        schedule_feeds (List[dict]): List of dictionaries with the keys
+            'schedule_version', 'feed_start_date', and 'feed_end_date'.
 
+    Returns:
+        dict: A dictionary with keys 'GTFS_data_list' and 'schedule_data_list'.
+            'GTFS_data_list' is a list of dictionaries with the keys 'schedule_version'
+            and 'data', which is the extracted data from the GTFS zip file.
+            'schedule_data_list' is a list of dictionaries with the same keys as 'GTFS_data_list', 
+            except that 'data' here is the route_daily_summary.
+    """
+    
+    GTFS_data_list = []
     schedule_data_list = []
     pbar = tqdm(schedule_feeds)
     for feed in pbar:
         schedule_version = feed["schedule_version"]
+        # Files with .zip suffix come from the CTA directly. 
+        # Otherwise, they come from transitfeeds.com 
+        if schedule_version.endswith('.zip'):
+            cta_download = True
+        else:
+            cta_download = False
         pbar.set_description(
             f"Generating daily schedule data for "
             f"schedule version {schedule_version}"
@@ -340,15 +349,18 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
             f"\nDownloading zip file for schedule version "
             f"{schedule_version}"
         )
-        CTA_GTFS = static_gtfs_analysis.download_zip(schedule_version)
+        CTA_GTFS, _ = static_gtfs_analysis.download_zip(schedule_version)
         logger.info("\nExtracting data")
         data = static_gtfs_analysis.GTFSFeed.extract_data(
             CTA_GTFS,
-            version_id=schedule_version
+            version_id=schedule_version,
+            cta_download=cta_download
         )
         data = static_gtfs_analysis.format_dates_hours(data)
+        GTFS_data_list.append({'fname': schedule_version, 'data': data})
 
         logger.info("\nSummarizing trip data")
+
         trip_summary = static_gtfs_analysis.make_trip_summary(data, 
             pendulum.from_format(feed['feed_start_date'], 'YYYY-MM-DD'), 
             pendulum.from_format(feed['feed_end_date'], 'YYYY-MM-DD'))
@@ -360,8 +372,34 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
 
         schedule_data_list.append(
             {"schedule_version": schedule_version,
-             "data": route_daily_summary}
+                "data": route_daily_summary}
         )
+
+
+    return {
+        'GTFS_data_list': GTFS_data_list,
+        'schedule_data_list': schedule_data_list
+    }
+
+def main(freq: str = 'D', schedule_feeds: List[dict] = None
+    ) -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
+    """Calculate the summary by route and day across multiple schedule versions
+
+    Args:
+        freq (str): Frequency of aggregation. Defaults to Daily.
+        schedule_feeds (List[dict]): List of dictionaries with the keys
+            'schedule_version', 'feed_start_date', and 'feed_end_date'.
+    Returns:
+        pd.DataFrame: A DataFrame of every day in the specified data with
+            scheduled and observed count of trips.
+        pd.DataFrame: A DataFrame summary across
+            versioned schedule comparisons.
+    """
+    if schedule_feeds is None:
+        schedule_feeds = create_schedule_list(month=5, year=2022)
+
+    schedule_data_list = create_GTFS_data_list(schedule_feeds)['schedule_data_list']
+    
     agg_info = AggInfo(freq=freq)
     combined_long, combined_grouped = combine_real_time_rt_comparison(
         schedule_feeds,

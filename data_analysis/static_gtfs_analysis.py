@@ -62,6 +62,8 @@ class GTFSFeed:
                 165/20220718/download or https://www.transitchicago.com/downloads/sch_data/
             version_id (str, optional): The schedule version in use.
                 Defaults to None.
+            cta_download (bool): whether data is coming from the CTA directy (transitchicago.com)
+
 
         Returns:
             GTFSFeed: A GTFSFeed object containing multiple DataFrames
@@ -359,16 +361,15 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
         zipfile.ZipFile: A zipfile for the CTA version id.
     """
     logger.info('Downloading CTA data')
-    CTA_GTFS = zipfile.ZipFile(
-        BytesIO(
+    zipfile_bytes_io = BytesIO(
             requests.get(
                 f"https://transitfeeds.com/p/chicago-transit-authority"
                 f"/165/{version_id}/download"
             ).content
         )
-    )
+    CTA_GTFS = zipfile.ZipFile(zipfile_bytes_io)
     logging.info('Download complete')
-    return CTA_GTFS
+    return CTA_GTFS, zipfile_bytes_io
 
 
 def download_extract_format(version_id: str = None) -> GTFSFeed:
@@ -385,9 +386,11 @@ def download_extract_format(version_id: str = None) -> GTFSFeed:
     """
     if version_id is None:
         CTA_GTFS, _ = download_cta_zip()
+        cta_download = True
     else:
-        CTA_GTFS = download_zip(version_id)
-    data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id)
+        CTA_GTFS, _ = download_zip(version_id)
+        cta_download = False
+    data = GTFSFeed.extract_data(CTA_GTFS, version_id=version_id, cta_download=cta_download)
     data = format_dates_hours(data)
     return data
 

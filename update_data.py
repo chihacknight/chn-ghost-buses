@@ -122,62 +122,14 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     start_date = data_update.start_date
     end_date = data_update.end_date
 
-    # Remove 74 Fullerton bus from data
-    combined_long_df = combined_long_df.loc[combined_long_df["route_id"] != "74"]
-    summary_df = summary_df.loc[summary_df["route_id"] != "74"]
-
-    route_daily_mean = (
-        combined_long_df.groupby(["route_id"])["trip_count_rt"]
-        .mean()
-        .round(1)
-        .reset_index()
-    )
-
-    route_daily_mean.rename(
-        columns={"trip_count_rt": "avg_trip_count_rt"}, inplace=True
-    )
-
-    summary_df_mean = summary_df.merge(route_daily_mean, on="route_id")
-
-    combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df["date"])
-
-    # Add ridership data to summary_df_mean
-    ridership_by_rte_date = plots.fetch_ridership_data()
-
-    ridership_end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
-
-    merged_df = plots.merge_ridership_combined(
-        combined_long_df=combined_long_df,
-        ridership_df=ridership_by_rte_date,
-        start_date=start_date,
-        ridership_end_date=ridership_end_date,
-    )
-
-    daily_means_riders = plots.calculate_trips_per_rider(merged_df)
-
-    # This is the average trip count corresponding to the ridership data,
-    # which is usually a few months out of date. So we can drop it here and use
-    # the up-to-date avg_trip_count_rt in summary_df_mean.
-
-    daily_means_riders.drop(columns="avg_trip_count_rt", inplace=True)
-
-    summary_df_mean = summary_df_mean.merge(daily_means_riders, on="route_id")
-
-    # Skip route_id and day_type in the percentile and ranking calculations
-    for col in summary_df_mean.columns[2:]:
-        summary_df_mean = plots.calculate_percentile_and_rank(summary_df_mean, col=col)
 
     # JSON files for frontend interactive map by day type
+    summary_kwargs = {'column': 'ratio'}
     for day_type in plots.DAY_NAMES.keys():
-        summary_df_mean_day = plots.filter_day_type(summary_df_mean, day_type=day_type)
-        save_path = (
-            plots.DATA_PATH / f"all_routes_{start_date}_to_{end_date}_{day_type}"
-        )
-        summary_df_mean_day.to_json(
-            f"{save_path}.json", date_format="iso", orient="records"
-        )
-        summary_df_mean_day.to_html(f"{save_path}_table.html", index=False)
-
+        summary_gdf_geo_day = plots.create_summary_gdf_geo(combined_long_df, summary_df, day_type='wk')
+        save_name = f"all_routes_{start_date}_to_{end_date}_{day_type}"
+        plots.save_json(summary_gdf_geo_day, summary_kwargs=summary_kwargs, save_name=save_name)
+        
 
 def update_lineplot_data(data_update: DataUpdate) -> None:
     """Refresh data for lineplots of bus performance over time
@@ -203,38 +155,50 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     start_date = data_update.start_date
     end_date = data_update.end_date
 
+    # Remove the datetime.
+    combined_long_df.loc[:, 'date'] = combined_long_df.loc[:, 'date'].dt.strftime('%Y-%m-%d')
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]
-
+    all_day_types_path = plots.create_save_path(
+        f"schedule_vs_realtime_all_day_types_routes_{start_date}_to_{end_date}",
+        plots.DATA_PATH
+    )
     combined_long_df[json_cols].to_json(
-        plots.DATA_PATH / f"schedule_vs_realtime_all_day_types_routes_"
-        f"{start_date}_to_{end_date}.json",
+        f"{all_day_types_path}.json",
         date_format="iso",
         orient="records",
     )
     combined_long_df_wk = plots.filter_day_type(combined_long_df, "wk")
 
+    wk_path = plots.create_save_path("schedule_vs_realtime_wk_routes"
+        f"_{start_date}_to_{end_date}", plots.DATA_PATH)
     combined_long_df_wk[json_cols].to_json(
-        plots.DATA_PATH / f"schedule_vs_realtime_wk_routes"
-        f"_{start_date}_to_{end_date}.json",
+        f"{wk_path}.json",
         date_format="iso",
         orient="records",
     )
     json_cols.pop()
     combined_long_groupby_date = plots.groupby_long_df(combined_long_df, "date")
 
+    all_day_types_overall_path = plots.create_save_path(
+        f"schedule_vs_realtime_all_day_types_overall_"
+        f"{start_date}_to_{end_date}",
+        plots.DATA_PATH
+    )
     combined_long_groupby_date[json_cols].to_json(
-        plots.DATA_PATH / f"schedule_vs_realtime_all_day_types_overall_"
-        f"{start_date}_to_{end_date}.json",
+        f"{all_day_types_overall_path}.json",
         date_format="iso",
         orient="records",
     )
 
     combined_long_groupby_date_wk = plots.groupby_long_df(combined_long_df_wk, "date")
 
-    combined_long_groupby_date_wk[json_cols].to_json(
+    wk_overall_path = plots.create_save_path(
+        f"schedule_vs_realtime_wk_overall_{start_date}_to_{end_date}",
         plots.DATA_PATH
-        / f"schedule_vs_realtime_wk_overall_{start_date}_to_{end_date}.json",
+    )
+    combined_long_groupby_date_wk[json_cols].to_json(
+        f"{wk_overall_path}.json",
         date_format="iso",
         orient="records",
     )

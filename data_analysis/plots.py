@@ -1,5 +1,7 @@
 import os
+import json
 from datetime import datetime
+import pendulum
 from pathlib import Path
 from typing import List, Union
 
@@ -565,19 +567,7 @@ def plot_and_save(
         summary_kwargs=summary_kwargs,
         save_name=save_name,
     )
-
-    path_name = create_save_path(save_name, DATA_PATH)
-    # Take only the columns related to summary_kwargs['column']
-    # and those used in the map
-    first_cols = summary_gdf_geo.columns[:2].tolist()
-    last_cols = summary_gdf_geo.columns[-10:].to_list()
-    kwargs_cols = summary_gdf_geo.columns[
-        summary_gdf_geo.columns.str.startswith(summary_kwargs["column"])
-    ].tolist()
-    cols = first_cols + kwargs_cols + last_cols
-    summary_gdf_geo[cols].to_file(f"{path_name}.json", driver="GeoJSON")
-    summary_gdf_geo[cols].to_html(f"{path_name}_table.html", index=False)
-
+    save_json(summary_gdf_geo, summary_kwargs, save_name)
 
 def calculate_trips_per_rider(
     merged_df: pd.DataFrame, num_riders: int = 1000
@@ -963,20 +953,18 @@ def run_mvp() -> None:
 
     make_ward_maps(summary_df_wk, start_date, end_date)
 
-
-def main(day_type: str = None) -> None:
-    """Generate maps of all routes, top 10 best routes,
-    top 10 worst routes, and ridership
-
-    Args:
-        day_type (str, optional): day_type to filter by. Defaults to None.
-    """
+def create_summary_gdf_geo(
+        combined_long_df: pd.DataFrame,
+        summary_df: pd.DataFrame,
+        day_type: str = None) -> gpd.GeoDataFrame:
+    
     logger.info("Creating GeoDataFrame")
     gdf = static_gtfs_analysis.main()
 
     logger.info("Getting latest real-time and schedule comparison data")
-
-    combined_long_df, summary_df = compare_scheduled_and_rt.main(freq="D")
+    combined_long_df = combined_long_df.loc[combined_long_df['route_id'] != '74']
+    summary_df = summary_df.loc[summary_df['route_id'] != '74']
+    gdf = gdf.loc[gdf.route_id != "74"]
 
     if day_type is not None:
         summary_df = filter_day_type(summary_df, day_type=day_type)
@@ -1002,13 +990,10 @@ def main(day_type: str = None) -> None:
 
     summary_gdf = summary_df_mean.merge(gdf, how="right", on="route_id")
 
-    summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
-
     combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df.loc[:, "date"])
 
     start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
-    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
-
+    
     ridership_by_rte_date = fetch_ridership_data()
 
     ridership_end_date = ridership_by_rte_date["date"].max().strftime("%Y-%m-%d")
@@ -1034,8 +1019,78 @@ def main(day_type: str = None) -> None:
 
     summary_gdf = summary_df_mean.merge(gdf, how="right", on="route_id")
 
-    summary_gdf_geo = gpd.GeoDataFrame(summary_gdf)
+    return gpd.GeoDataFrame(summary_gdf)
 
+
+def save_json(summary_gdf_geo: gpd.GeoDataFrame, summary_kwargs: dict, save_name: str) -> None:
+    """Save JSON file from GeoDataFrame
+
+    Args:
+        summary_gdf_geo (gpd.GeoDataFrame): output of create_summary_gdf_geo function
+        summary_kwargs (dict): A dictionary with the kwargs passed to geopandas explore. Requires
+            a 'column' key at minimum
+        save_name (str): name of the json output file
+    """
+    # Make directory for GitHub actions
+    path_name = create_save_path(save_name, DATA_PATH)
+    # Take only the columns related to summary_kwargs['column']
+    # and those used in the map
+    first_cols = summary_gdf_geo.columns[:2].tolist()
+    last_cols = summary_gdf_geo.columns[-10:].to_list()
+    kwargs_cols = summary_gdf_geo.columns[
+        summary_gdf_geo.columns.str.startswith(summary_kwargs["column"])
+    ].tolist()
+    cols = first_cols + kwargs_cols + last_cols
+    print(f'Saving {path_name}')
+    summary_gdf_geo[cols].to_file(f"{path_name}.json", driver="GeoJSON")
+    summary_gdf_geo[cols].to_html(f"{path_name}_table.html", index=False)
+
+
+def create_frontend_json(json_file: str, start_date: str, end_date: str, save_path: str, save: bool = True) -> None:
+    """Create the data.json file that is used for the map at ghostbuses.com
+
+    Args:
+        json_file (str): name of the json input file
+        start_date (str): start date of the data in YYYY-MM-DD format
+        end_date (str): end date of the data in YYYY-MM-DD format
+        save_path (str): The path to save the output file. 
+        save (bool, optional): Whether to save the JSON output. Defaults to True.
+
+    Raises:
+        ValueError: If save is True, the save_path argument cannot be None.
+    """
+    json_path = create_save_path(json_file, DATA_PATH)
+    with open(f'{json_path}.json') as json_data:
+        data = json.load(json_data)
+        data['dates'] = {'start': start_date, 'end': end_date}
+    if save:
+        with open(save_path, 'w') as output_json:
+            json.dump(data, output_json)
+    else:
+        return json.dumps(data, indent=4)
+
+
+def main(day_type: str = None) -> None:
+    """Generate maps of all routes, top 10 best routes,
+    top 10 worst routes, and ridership
+
+    Args:
+        day_type (str, optional): day_type to filter by. Defaults to None.
+    """
+    logger.info("Getting latest real-time and schedule comparison data")
+
+    combined_long_df, summary_df = compare_scheduled_and_rt.main(freq="D")
+    today = datetime.now().strftime('%Y-%m-%d')
+    combined_long_df.to_csv(DATA_PATH / f'combined_long_df_{today}.csv', index=False)
+    summary_df.to_csv(DATA_PATH / f'summary_df_{today}.csv', index=False)
+
+    combined_long_df.loc[:, "date"] = pd.to_datetime(combined_long_df.loc[:, "date"])
+
+    start_date = combined_long_df["date"].min().strftime("%Y-%m-%d")
+    end_date = combined_long_df["date"].max().strftime("%Y-%m-%d")
+
+    summary_gdf_geo = create_summary_gdf_geo(combined_long_df, summary_df, day_type)
+    
     make_all_maps(
         summary_gdf_geo=summary_gdf_geo, start_date=start_date, end_date=end_date
     )

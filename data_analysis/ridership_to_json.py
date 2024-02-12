@@ -64,7 +64,8 @@ def get_latest_month_and_year(ridership_df: pd.DataFrame) -> tuple:
     return latest_date.month, latest_date.year
 
 
-def ridership_to_json(ridership_df: pd.DataFrame, month: int = None, year: int = None) -> None:
+def ridership_to_json(ridership_df: pd.DataFrame, month: int = None, year: int = None,
+                      save: bool = True) -> None:
     """
     Save ridership data to JSON for given month and year.
     Note that the data is typically a few months 
@@ -83,6 +84,7 @@ def ridership_to_json(ridership_df: pd.DataFrame, month: int = None, year: int =
         4	9	01/01/2001	U	11207
         month (int): Month of interest. Defaults to None
         year (int): Year of interest. Defaults to None
+        save (bool): Whether to save JSON locally. Defaults to True.
     """
     ridership = ridership_df.copy()
     latest_month, latest_year = get_latest_month_and_year(ridership)
@@ -119,13 +121,16 @@ def ridership_to_json(ridership_df: pd.DataFrame, month: int = None, year: int =
     df_daytype_summary_json = df_daytype_summary.to_json(orient='records')
     full_json = {'date': f'{month_name} {year}'}
     full_json['data'] = json.loads(df_daytype_summary_json)
-    with open(DATA_PATH / f'{month_name}_{year}_cta_ridership_data_day_type_summary.json', 'w') as outfile:
-        json.dump(full_json, outfile)
-
+    if save:
+        with open(DATA_PATH / f'{month_name}_{year}_cta_ridership_data_day_type_summary.json', 'w') as outfile:
+            json.dump(full_json, outfile)
+    else:
+        return json.dumps(full_json, indent=4)
+    
 app = typer.Typer()
 
 @app.command()
-def main(month: int = None, year: int = None) -> None:
+def main(month: int = None, year: int = None, save: bool = True) -> None:
     
     print("Loading data from data.cityofchicago.org")
     ridership_df = pd.read_csv(
@@ -133,7 +138,7 @@ def main(month: int = None, year: int = None) -> None:
         'jyb9-n7fm/rows.csv?accessType=DOWNLOAD'
     )
     print("Done!")
-    ridership_to_json(ridership_df=ridership_df, month=month, year=year)
+    ridership_to_json(ridership_df=ridership_df, month=month, year=year, save=save)
 
 
 if __name__ == '__main__':

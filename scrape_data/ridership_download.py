@@ -24,12 +24,12 @@ def save_ridership_json() -> None:
     s3_ridership_json_path = 'frontend_data_files/cta_ridership_data_day_type_summary.json'
     print(f'Saving {s3_ridership_json_path}')
     s3.Object(
-        sga.BUCKET_PUBLIC,
+        sga.BUCKET,
         f'{s3_ridership_json_path}')\
         .put(Body=ridership_json)
 
     # Check that the file was uploaded successfully
-    keys(sga.BUCKET_PUBLIC, [s3_ridership_json_path])
+    keys(sga.BUCKET, [s3_ridership_json_path])
 
 
 # https://stackoverflow.com/questions/30249069/listing-contents-of-a-bucket-with-boto3

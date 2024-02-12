@@ -138,7 +138,7 @@ def main(month: int = None, year: int = None, save: bool = True) -> None:
         'jyb9-n7fm/rows.csv?accessType=DOWNLOAD'
     )
     print("Done!")
-    ridership_to_json(ridership_df=ridership_df, month=month, year=year, save=save)
+    return ridership_to_json(ridership_df=ridership_df, month=month, year=year, save=save)
 
 
 if __name__ == '__main__':

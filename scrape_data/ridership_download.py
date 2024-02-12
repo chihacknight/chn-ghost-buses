@@ -1,7 +1,7 @@
 import boto3
 import sys
 import data_analysis.ridership_to_json as ridership_to_json
-import data_analysis.compare_scheduled_and_rt as csrt
+import data_analysis.static_gtfs_analysis as sga
 
 ACCESS_KEY = sys.argv[1]
 SECRET_KEY = sys.argv[2]
@@ -24,12 +24,12 @@ def save_ridership_json() -> None:
     s3_ridership_json_path = 'frontend_data_files/cta_ridership_data_day_type_summary.json'
     print(f'Saving {s3_ridership_json_path}')
     s3.Object(
-        csrt.BUCKET_PUBLIC,
+        sga.BUCKET_PUBLIC,
         f'{s3_ridership_json_path}')\
         .put(Body=ridership_json)
 
     # Check that the file was uploaded successfully
-    keys(csrt.BUCKET_PUBLIC, [s3_ridership_json_path])
+    keys(sga.BUCKET_PUBLIC, [s3_ridership_json_path])
 
 
 # https://stackoverflow.com/questions/30249069/listing-contents-of-a-bucket-with-boto3

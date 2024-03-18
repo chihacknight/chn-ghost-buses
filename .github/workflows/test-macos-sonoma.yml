@@ -1,0 +1,27 @@
+name: Test macOS Sonoma
+
+on:
+  push:
+    branches:
+        - test-macos-sonoma
+  
+env: 
+  PYTHON_VERSION: 3.12.0
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  install-requirements:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+        
+      - name: install-requirements
+
+        run: |
+          pip install -r requirements.txt

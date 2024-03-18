@@ -6,7 +6,7 @@ on:
         - test-macos-sonoma
   
 env: 
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.11
 
 jobs:
   install-requirements:

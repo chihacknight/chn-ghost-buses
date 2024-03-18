@@ -21,8 +21,10 @@ jobs:
         
       - name: install-requirements
 
+        # Check Python version and hardware version.
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -V
+          sysctl -n machdep.cpu.brand_string
           pip install -r requirements.txt

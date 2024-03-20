@@ -13,7 +13,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
-from scrape_data.scrape_schedule_versions import create_schedule_list
+from scrape_data.scrape_schedule_versions import create_schedule_list, ScheduleFeedInfo
 from utils import s3_csv_reader
 
 load_dotenv()
@@ -174,7 +174,7 @@ def sum_trips_by_rt_by_freq(
 
 # Read in pre-computed files of RT and scheduled data and compare!
 def combine_real_time_rt_comparison(
-    schedule_feeds: List[dict],
+    schedule_feeds: List[ScheduleFeedInfo],
     schedule_data_list: List[dict],
     agg_info: AggInfo,
     holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
@@ -182,8 +182,8 @@ def combine_real_time_rt_comparison(
     """Generate a combined DataFrame with the realtime route comparisons
 
     Args:
-        schedule_feeds (List[dict]): A list of dictionaries with the keys
-             "schedule_version", "feed_start_date", and "feed_end_date"
+        schedule_feeds (List[ScheduleFeedInfo]): A list of ScheduleFeedInfo instances,
+            each representing a schedule feed covering a specific time period.
         schedule_data_list (List[dict]): A list of dictionaries with a
             "schedule_version" key and "data" key with a value corresponding to
             the daily route summary for that version.

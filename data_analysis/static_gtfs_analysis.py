@@ -402,7 +402,7 @@ def main() -> geopandas.GeoDataFrame:
 
     schedule_list = create_schedule_list(5, 2022)
     # Get the latest version
-    version_id = schedule_list[-1]['schedule_version']
+    version_id = schedule_list[-1].schedule_version
 
     data = download_extract_format(version_id)
 

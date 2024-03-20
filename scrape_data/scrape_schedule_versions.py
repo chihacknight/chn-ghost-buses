@@ -14,6 +14,36 @@ logger.setLevel(logging.INFO)
 BASE_URL = "https://transitfeeds.com"
 
 
+class ScheduleFeedInfo:
+    """Represents a single schedule version with feed start and end dates.
+    """
+
+    def __init__(self, version, start_date, end_date):
+        self.schedule_version = version
+        self.feed_start_date = start_date
+        self.feed_end_date = end_date
+
+    def __str__(self):
+        return f'v_{self.schedule_version}_fs_{self.feed_start_date}_fe_{self.feed_end_date}'
+
+    def __getitem__(self, item):
+        if item not in frozenset(['schedule_version', 'feed_start_date', 'feed_end_date']):
+            raise KeyError(item)
+        return self.__dict__[item]
+
+    @classmethod
+    def from_pendulum(cls, version, start_date, end_date):
+        return cls(version.format("YYYYMMDD"),
+                   start_date.format("YYYY-MM-DD"),
+                   end_date.format("YYYY-MM-DD"))
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(d['schedule_version'],
+                   d['feed_start_date'],
+                   d['feed_end_date'])
+
+
 def check_latest_rt_data_date() -> str:
     """Fetch the latest available date of real-time bus data
 
@@ -162,7 +192,7 @@ def calculate_version_date_ranges(
 
 def create_schedule_list_dict(
     schedule_list: List[pendulum.date],
-        start_end_list: List[Tuple[pendulum.date, pendulum.date]]) -> List[dict]:
+        start_end_list: List[Tuple[pendulum.date, pendulum.date]]) -> List[ScheduleFeedInfo]:
     """Create a list of dictionaries with keys for the schedule_version,
        start_date, and end_date
 
@@ -173,7 +203,7 @@ def create_schedule_list_dict(
             for each version
 
     Returns:
-        List[dict]: A list of dictionaries with the start and end dates
+        List[ScheduleFeedInfo]: A list of ScheduleFeedInfos with the start and end dates
             corresponding to each schedule version.
     """
     schedule_list_dict = []
@@ -181,16 +211,12 @@ def create_schedule_list_dict(
         # Changing back the starting version to 20220507
         if version == pendulum.date(2022, 5, 19):
             version = pendulum.date(2022, 5, 7)
-        schedule_dict = {
-            "schedule_version": version.format("YYYYMMDD"),
-            "feed_start_date": start_date.format("YYYY-MM-DD"),
-            "feed_end_date": end_date.format("YYYY-MM-DD")
-        }
+        schedule_dict = ScheduleFeedInfo.from_pendulum(version, start_date, end_date)
         schedule_list_dict.append(schedule_dict)
     return schedule_list_dict
 
 
-def create_schedule_list(month: int, year: int, start2022: bool = True) -> List[dict]:
+def create_schedule_list(month: int, year: int, start2022: bool = True) -> List[ScheduleFeedInfo]:
     """Return a list of dictionaries with start and end dates
        for each schedule version.
 
@@ -202,7 +228,7 @@ def create_schedule_list(month: int, year: int, start2022: bool = True) -> List[
             real-time bus data collection. Defaults to True.
 
     Returns:
-        List[dict]: A list of dictionaries with the start and end dates
+        List[ScheduleFeedInfo]: A list of ScheduleFeedInfos with the start and end dates
             corresponding to each schedule version.
     """
     schedule_list, start_end_list = calculate_version_date_ranges(

@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
 from scrape_data.scrape_schedule_versions import create_schedule_list, ScheduleFeedInfo
 from utils import s3_csv_reader
+from data_analysis.memoize import memoize
 
 load_dotenv()
 
@@ -219,6 +220,7 @@ class Combiner:
             combined_long = pd.concat([combined_long, compare_freq_by_rte])
         return combined_long, combined_grouped
 
+    @memoize
     def process_one_feed(self, feed):
         start_date = feed["feed_start_date"]
         end_date = feed["feed_end_date"]
@@ -334,6 +336,7 @@ class Summarizer:
             )
         return summary
 
+    @memoize
     def create_route_daily_summary(self, feed) -> pd.DataFrame:
         schedule_version = feed["schedule_version"]
         self.pbar.set_description(
@@ -393,7 +396,7 @@ class Summarizer:
 
 def main(freq: str = 'D', save: bool = False):
     summarizer = Summarizer(freq, save)
-    summarizer.main()
+    return summarizer.main()
 
 
 if __name__ == "__main__":

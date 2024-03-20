@@ -23,6 +23,7 @@ from statsmodels.tsa.stattools import adfuller, kpss
 
 import data_analysis.compare_scheduled_and_rt as compare_scheduled_and_rt
 import data_analysis.static_gtfs_analysis as static_gtfs_analysis
+from data_analysis.memoize import memoize
 
 CHICAGO_COORDINATES = (41.85, -87.68)
 
@@ -347,6 +348,7 @@ def plot_map(
     return newmap
 
 
+@memoize
 def fetch_ridership_data() -> pd.DataFrame:
     """Download all ridership data i.e. from 2001 to present.
     Note that the latest data is usually a few months behind.

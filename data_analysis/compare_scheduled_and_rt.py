@@ -172,37 +172,54 @@ def sum_trips_by_rt_by_freq(
     return compare_freq_by_rte, compare_by_day_type
 
 
-# Read in pre-computed files of RT and scheduled data and compare!
-def combine_real_time_rt_comparison(
-    schedule_feeds: List[ScheduleFeedInfo],
-    schedule_data_list: List[dict],
-    agg_info: AggInfo,
-    holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
-        save: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Generate a combined DataFrame with the realtime route comparisons
+class Combiner:
+    # Read in pre-computed files of RT and scheduled data and compare!
+    def __init__(
+        self,
+        schedule_feeds: List[ScheduleFeedInfo],
+        schedule_data_list: List[dict],
+        agg_info: AggInfo,
+        holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"],
+            save: bool = True):
+        """Class to generate a combined DataFrame with the realtime route comparisons
 
-    Args:
-        schedule_feeds (List[ScheduleFeedInfo]): A list of ScheduleFeedInfo instances,
-            each representing a schedule feed covering a specific time period.
-        schedule_data_list (List[dict]): A list of dictionaries with a
-            "schedule_version" key and "data" key with a value corresponding to
-            the daily route summary for that version.
-        agg_info (AggInfo): An AggInfo object describing how data
-            is to be aggregated.
-        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
-            Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
-        save (bool, optional): whether to save the csv file to s3 bucket.
+        Args:
+            schedule_feeds (List[ScheduleFeedInfo]): A list of ScheduleFeedInfo instances,
+                each representing a schedule feed covering a specific time period.
+            schedule_data_list (List[dict]): A list of dictionaries with a
+                "schedule_version" key and "data" key with a value corresponding to
+                the daily route summary for that version.
+            agg_info (AggInfo): An AggInfo object describing how data
+                is to be aggregated.
+            holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+                Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
+            save (bool, optional): whether to save the csv file to s3 bucket.
+        """
+        self.pbar = tqdm(schedule_feeds)
+        self.schedule_data_list = schedule_data_list
+        self.agg_info = agg_info
+        self.holidays = holidays
+        self.save = save
 
-    Returns:
-        pd.DataFrame: Combined DataFrame of various schedule versions
-            with daily counts of observed and scheduled trip count by route.
-        pd.DataFrame: Combined DataFrame of various schedule versions
-            with totals per route by a specified frequency.
-    """
-    combined_grouped = pd.DataFrame()
-    combined_long = pd.DataFrame()
-    pbar = tqdm(schedule_feeds)
-    for feed in pbar:
+    def combine_real_time_rt_comparison(
+            self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Generate a combined DataFrame with the realtime route comparisons
+
+        Returns:
+            pd.DataFrame: Combined DataFrame of various schedule versions
+                with daily counts of observed and scheduled trip count by route.
+            pd.DataFrame: Combined DataFrame of various schedule versions
+                with totals per route by a specified frequency.
+        """
+        combined_long = pd.DataFrame()
+        combined_grouped = pd.DataFrame()
+        for feed in self.pbar:
+            compare_by_day_type, compare_freq_by_rte = self.process_one_feed(feed)
+            combined_grouped = pd.concat([combined_grouped, compare_by_day_type])
+            combined_long = pd.concat([combined_long, compare_freq_by_rte])
+        return combined_long, combined_grouped
+
+    def process_one_feed(self, feed):
         start_date = feed["feed_start_date"]
         end_date = feed["feed_end_date"]
         date_range = [
@@ -212,13 +229,13 @@ def combine_real_time_rt_comparison(
                 pendulum.from_format(end_date, "YYYY-MM-DD"),
             ).range("days")
         ]
-        pbar.set_description(
+        self.pbar.set_description(
             f"Loading schedule version {feed['schedule_version']}"
         )
 
         schedule_raw = (
             next(
-                data_dict["data"] for data_dict in schedule_data_list
+                data_dict["data"] for data_dict in self.schedule_data_list
                 if feed["schedule_version"] == data_dict["schedule_version"]
             )
         )
@@ -227,7 +244,7 @@ def combine_real_time_rt_comparison(
         date_pbar = tqdm(date_range)
         for day in date_pbar:
             date_str = day.to_date_string()
-            pbar.set_description(
+            self.pbar.set_description(
                 f" Processing {date_str} at "
                 f"{pendulum.now().to_datetime_string()}"
             )
@@ -247,14 +264,14 @@ def combine_real_time_rt_comparison(
         compare_freq_by_rte, compare_by_day_type = sum_trips_by_rt_by_freq(
             rt_df=rt,
             sched_df=schedule,
-            agg_info=agg_info,
-            holidays=holidays
+            agg_info=self.agg_info,
+            holidays=self.holidays
         )
 
         compare_by_day_type['feed_version'] = feed['schedule_version']
         compare_freq_by_rte['feed_version'] = feed['schedule_version']
 
-        if save:
+        if self.save:
             outpath = (
                 (SCHEDULE_RT_PATH /
                  f'schedule_v{feed["schedule_version"]}_'
@@ -266,68 +283,60 @@ def combine_real_time_rt_comparison(
                 index=False,
             )
         logger.info(f" Processing version {feed['schedule_version']}")
-        combined_grouped = pd.concat([combined_grouped, compare_by_day_type])
-        combined_long = pd.concat([combined_long, compare_freq_by_rte])
-
-    return combined_long, combined_grouped
+        return compare_by_day_type, compare_freq_by_rte
 
 
-def build_summary(
-    combined_df: pd.DataFrame,
-        save: bool = True) -> pd.DataFrame:
-    """Create a summary by route and day type
+class Summarizer:
+    def __init__(self, freq: str = 'D', save: bool = True):
+        """Calculate the summary by route and day across multiple schedule versions
 
-    Args:
-        combined_df (pd.DataFrame): A DataFrame with all schedule versions
-        save (bool, optional): whether to save DataFrame to s3.
-            Defaults to True.
+        Args:
+            freq (str): Frequency of aggregation. Defaults to Daily.
+            save (bool, optional): whether to save DataFrame to s3.
+                Defaults to True.
+        """
+        self.freq = freq
+        self.save = save
+        self.schedule_feeds = create_schedule_list(month=5, year=2022)
+        self.schedule_data_list = []
+        self.pbar = tqdm(self.schedule_feeds)
 
-    Returns:
-        pd.DataFrame: A DataFrame summary across
-            versioned schedule comparisons.
-    """
-    combined_df = combined_df.copy(deep=True)
-    summary = (
-        combined_df.groupby(["route_id", "day_type"])[
-            ["trip_count_rt", "trip_count_sched"]
-        ]
-        .sum()
-        .reset_index()
-    )
+    def build_summary(self, combined_df: pd.DataFrame) -> pd.DataFrame:
+        """Create a summary by route and day type
 
-    summary["ratio"] = summary["trip_count_rt"] / summary["trip_count_sched"]
+        Args:
+            combined_df (pd.DataFrame): A DataFrame with all schedule versions
 
-    if save:
-        outpath = (
-            (SCHEDULE_RT_PATH /
-             f"combined_schedule_realtime_rt_level_comparison_"
-             f"{pendulum.now()}.csv").as_uri()
+        Returns:
+            pd.DataFrame: A DataFrame summary across
+                versioned schedule comparisons.
+        """
+        combined_df = combined_df.copy(deep=True)
+        summary = (
+            combined_df.groupby(["route_id", "day_type"])[
+                ["trip_count_rt", "trip_count_sched"]
+            ]
+            .sum()
+            .reset_index()
         )
-        summary.to_csv(
-            outpath,
-            index=False,
-        )
-    return summary
 
+        summary["ratio"] = summary["trip_count_rt"] / summary["trip_count_sched"]
 
-def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
-    """Calculate the summary by route and day across multiple schedule versions
+        if self.save:
+            outpath = (
+                (SCHEDULE_RT_PATH /
+                 f"combined_schedule_realtime_rt_level_comparison_"
+                 f"{pendulum.now()}.csv").as_uri()
+            )
+            summary.to_csv(
+                outpath,
+                index=False,
+            )
+        return summary
 
-    Args:
-        freq (str): Frequency of aggregation. Defaults to Daily.
-    Returns:
-        pd.DataFrame: A DataFrame of every day in the specified data with
-        scheduled and observed count of trips.
-        pd.DataFrame: A DataFrame summary across
-            versioned schedule comparisons.
-    """
-    schedule_feeds = create_schedule_list(month=5, year=2022)
-
-    schedule_data_list = []
-    pbar = tqdm(schedule_feeds)
-    for feed in pbar:
+    def create_route_daily_summary(self, feed) -> pd.DataFrame:
         schedule_version = feed["schedule_version"]
-        pbar.set_description(
+        self.pbar.set_description(
             f"Generating daily schedule data for "
             f"schedule version {schedule_version}"
         )
@@ -345,26 +354,46 @@ def main(freq: str = 'D') -> Tuple[List[dict],pd.DataFrame, pd.DataFrame]:
         data = static_gtfs_analysis.format_dates_hours(data)
 
         logger.info("\nSummarizing trip data")
-        trip_summary = static_gtfs_analysis.make_trip_summary(data, 
-            pendulum.from_format(feed['feed_start_date'], 'YYYY-MM-DD'), 
+        trip_summary = static_gtfs_analysis.make_trip_summary(data,
+            pendulum.from_format(feed['feed_start_date'], 'YYYY-MM-DD'),
             pendulum.from_format(feed['feed_end_date'], 'YYYY-MM-DD'))
 
         route_daily_summary = (
             static_gtfs_analysis
             .summarize_date_rt(trip_summary)
         )
+        return route_daily_summary
 
-        schedule_data_list.append(
-            {"schedule_version": schedule_version,
-             "data": route_daily_summary}
+    def main(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Calculate the summary by route and day across multiple schedule versions
+
+        Returns:
+            pd.DataFrame: A DataFrame of every day in the specified data with
+            scheduled and observed count of trips.
+            pd.DataFrame: A DataFrame summary across
+                versioned schedule comparisons.
+        """
+        for feed in self.pbar:
+            schedule_version = feed["schedule_version"]
+            route_daily_summary = self.create_route_daily_summary(feed)
+            self.schedule_data_list.append(
+                {"schedule_version": schedule_version,
+                 "data": route_daily_summary}
+            )
+        agg_info = AggInfo(freq=self.freq)
+        combiner = Combiner(
+            self.schedule_feeds,
+            schedule_data_list=self.schedule_data_list,
+            agg_info=agg_info,
+            save=self.save
         )
-    agg_info = AggInfo(freq=freq)
-    combined_long, combined_grouped = combine_real_time_rt_comparison(
-        schedule_feeds,
-        schedule_data_list=schedule_data_list,
-        agg_info=agg_info,
-        save=False)
-    return combined_long, build_summary(combined_grouped, save=False)
+        combined_long, combined_grouped = combiner.combine_real_time_rt_comparison()
+        return combined_long, self.build_summary(combined_grouped)
+
+
+def main(freq: str = 'D', save: bool = False):
+    summarizer = Summarizer(freq, save)
+    summarizer.main()
 
 
 if __name__ == "__main__":

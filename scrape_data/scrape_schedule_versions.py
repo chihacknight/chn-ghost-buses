@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Tuple
 
 from bs4 import BeautifulSoup
@@ -14,14 +15,13 @@ logger.setLevel(logging.INFO)
 BASE_URL = "https://transitfeeds.com"
 
 
+@dataclass
 class ScheduleFeedInfo:
     """Represents a single schedule version with feed start and end dates.
     """
-
-    def __init__(self, version, start_date, end_date):
-        self.schedule_version = version
-        self.feed_start_date = start_date
-        self.feed_end_date = end_date
+    schedule_version: str
+    feed_start_date: str
+    feed_end_date: str
 
     def __str__(self):
         return f'v_{self.schedule_version}_fs_{self.feed_start_date}_fe_{self.feed_end_date}'
@@ -36,12 +36,6 @@ class ScheduleFeedInfo:
         return cls(version.format("YYYYMMDD"),
                    start_date.format("YYYY-MM-DD"),
                    end_date.format("YYYY-MM-DD"))
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(d['schedule_version'],
-                   d['feed_start_date'],
-                   d['feed_end_date'])
 
 
 def check_latest_rt_data_date() -> str:

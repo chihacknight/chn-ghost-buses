@@ -74,6 +74,10 @@ class FileManager:
         for method_name, files in self.index.items():
             for filename, key in files.items():
                 filepath = PERSIST_PATH / method_name / filename
+                if not filepath.exists():
+                    logging.info(f'File {filepath} does not exist. Ignoring.')
+                    files[filename] = None
+                    continue
                 v = pickle.load(filepath.open('rb'))
                 self.d.setdefault(method_name, {})[tuple(key)] = v
 

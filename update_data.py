@@ -1,4 +1,5 @@
 from collections import namedtuple
+import calendar
 
 import pandas as pd
 
@@ -270,10 +271,10 @@ def update_barchart_data(
 
     last_month = plots.datetime.now().month - 1
     current_year = plots.datetime.now().year
-    last_day = plots.calendar.monthrange(current_year, last_month)[1]
+    last_day = calendar.monthrange(current_year, last_month)[1]
     last_month_str = f"0{last_month}" if last_month < 10 else str(last_month)
 
-    combined_long_groupby_day_type = plots.filter_dates(
+    combined_long_groupby_day_type = filter_dates(
         combined_long_groupby_day_type,
         bar_start_date,
         f"{current_year}-{last_month_str}-{last_day}",

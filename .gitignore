@@ -8,15 +8,12 @@ venv
 .idea/
 
 # ignore files in scratch subfolder in plots and data_output folders
-!data_analysis/scratch/*
-data_analysis/scratch/*
 !data_output/scratch/*
 data_output/scratch/*
 !plots/scratch/*
 plots/scratch/*
 
 # Keep the .gitkeep files to preserve folder structure
-!data_analysis/scratch/.gitkeep
 !data_output/scratch/.gitkeep
 !plots/scratch/.gitkeep
 

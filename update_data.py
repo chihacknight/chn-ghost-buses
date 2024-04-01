@@ -1,9 +1,13 @@
 from collections import namedtuple
+from argparse import ArgumentParser
+import calendar
+import datetime
 
 import pandas as pd
 
 import data_analysis.compare_scheduled_and_rt as csrt
 import data_analysis.plots as plots
+from data_analysis.cache_manager import CacheManager
 
 DataUpdate = namedtuple(
     "DataUpdate", ["combined_long_df", "summary_df", "start_date", "end_date"]
@@ -270,10 +274,10 @@ def update_barchart_data(
 
     last_month = plots.datetime.now().month - 1
     current_year = plots.datetime.now().year
-    last_day = plots.calendar.monthrange(current_year, last_month)[1]
+    last_day = calendar.monthrange(current_year, last_month)[1]
     last_month_str = f"0{last_month}" if last_month < 10 else str(last_month)
 
-    combined_long_groupby_day_type = plots.filter_dates(
+    combined_long_groupby_day_type = filter_dates(
         combined_long_groupby_day_type,
         bar_start_date,
         f"{current_year}-{last_month_str}-{last_day}",
@@ -308,9 +312,53 @@ def update_barchart_data(
     )
 
 
+class Updater:
+    def __init__(self, previous_file):
+        self.previous_df = pd.read_json(previous_file)
+
+    # https://stackoverflow.com/questions/13703720/converting-between-datetime-timestamp-and-datetime64
+    def latest(self):
+        return pd.Timestamp(max(self.previous_df['date'].unique())).to_pydatetime()
+
+
 def main() -> None:
     """Refresh data for interactive map, lineplots, and barcharts."""
-    combined_long_df, summary_df = csrt.main(freq="D")
+    parser = ArgumentParser(
+        prog='UpdateData',
+        description='Update Ghost Buses Data',
+    )
+    parser.add_argument('--start_date', nargs=1, required=False, type=datetime.date.fromisoformat)
+    parser.add_argument('--end_date', nargs=1, required=False, type=datetime.date.fromisoformat)
+    parser.add_argument('--update', nargs=1, required=False, help="Update all-day comparison file.")
+    parser.add_argument('--frequency', nargs=1, required=False,
+                        help="Frequency as decribed in pandas offset aliases.")
+    parser.add_argument('--recalculate', action='store_true',
+                        help="Don't use the cache when calculating results.")
+    parser.add_argument('--verbose', action='store_true')
+    args = parser.parse_args()
+
+    start_date = None
+    end_date = None
+    if args.start_date:
+        start_date = datetime.datetime.combine(args.start_date[0], datetime.time(), tzinfo=datetime.UTC)
+    if args.end_date:
+        end_date = datetime.datetime.combine(args.end_date[0], datetime.time(), tzinfo=datetime.UTC)
+
+    existing_df = None
+    if args.update:
+        u = Updater(args.update[0])
+        start_date = u.latest()
+        existing_df = u.previous_df
+    freq = 'D'
+    if args.frequency:
+        freq = args.frequency[0]
+    cache_manager_args = {}
+    if args.recalculate:
+        cache_manager_args['ignore_cached_calculation'] = True
+    if args.verbose:
+        cache_manager_args['verbose'] = True
+    cache_manager = CacheManager(**cache_manager_args)
+    combined_long_df, summary_df = csrt.main(cache_manager, freq=freq, start_date=start_date, end_date=end_date, existing=existing_df)
 
     combined_long_df.loc[:, "ratio"] = (
         combined_long_df.loc[:, "trip_count_rt"]

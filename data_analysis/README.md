@@ -45,55 +45,45 @@ There are a few types of data available in the public S3 bucket. The **data** li
     The following code will work to load all available data. To change the date range, enter the `START_DATE` and `END_DATE` parameters in `YYYY-MM-DD` format. Note that one day of weekday data is about 28 MB. The script can take some time to run depending on how many days you are loading. 
 
     ```
-    START_DATE = "2022-05-20"
-    END_DATE = ""
+   import pendulum
+   import pandas as pd
+   
+   START_DATE = "2022-05-20"
+   END_DATE = "2022-05-25"
+   BUCKET_URL = "https://dmu5hq5f7fk32.cloudfront.net"
+   
+   start_date = pendulum.parse(START_DATE, tz="America/Chicago")
+   is_after_11 = pendulum.now("America/Chicago").hour >= 11
+   end_date = pendulum.parse(END_DATE, tz="America/Chicago") if END_DATE else (
+       pendulum.yesterday("America/Chicago") if is_after_11 else 
+       pendulum.now("America/Chicago").subtract(days=2)
+   )
+   
+   days_range = range((end_date - start_date).in_days() + 1)
+   date_list = [(start_date.add(days=x)).to_date_string() for x in days_range]
+   
+   data_list = []
+   errors_list = []
+   
+   for d in date_list:
+       data_url = f"{BUCKET_URL}/bus_full_day_data_v2/{d}.csv"
+       print(f"{pendulum.now()}: processing {d} data")
+       try:
+           daily_data = pd.read_csv(data_url, low_memory=False)
+           data_list.append(daily_data)
+       except Exception as e:
+           print(f"Error processing data for {d}: {e}")
+   
+       error_url = f"{BUCKET_URL}/bus_full_day_errors_v2/{d}.csv"
+       print(f"{pendulum.now()}: processing {d} errors")
+       try:
+           daily_errors = pd.read_csv(error_url, low_memory=False)
+           errors_list.append(daily_errors)
+       except Exception as e:
+           print(f"Error processing errors for {d}: {e}")
+   
+   data = pd.concat(data_list, ignore_index=True)
+   errors = pd.concat(errors_list, ignore_index=True)
 
-    import pendulum
-    import pandas as pd
-
-
-    BUCKET_URL = "https://dmu5hq5f7fk32.cloudfront.net"
-
-    start_date = pendulum.from_format(START_DATE, 'YYYY-MM-DD', tz = "America/Chicago")
-
-    if END_DATE:
-        end_date = pendulum.from_format(END_DATE, 'YYYY-MM-DD', tz = "America/Chicago")
-    else:
-        if pendulum.now("America/Chicago").hour >= 11:
-            end_date = pendulum.yesterday("America/Chicago")
-        else: 
-            end_date = pendulum.now("America/Chicago").subtract(days=2)
-
-    date_list = [d.to_date_string()
-            for d in pendulum.period(
-                start_date,
-                end_date
-            ).range("days")
-        ]
-
-    data_list = []
-    errors_list = []
-
-    for d in date_list:
-
-        url = BUCKET_URL + f"/bus_full_day_data_v2/{d}.csv"
-        print(f"{pendulum.now()}: processing {d} data")
-        daily_data = pd.read_csv(
-                url,
-                low_memory=False
-            )
-
-        data_list.append(daily_data)
-        
-        print(f"{pendulum.now()}: processing {d} errors")
-        daily_errors = pd.read_csv(
-                (BUCKET_URL + f"/bus_full_day_errors_v2/{d}.csv"),
-                low_memory=False
-            )
-
-        errors_list.append(daily_errors)
-
-    data = pd.concat(data_list)
-    errors = pd.concat(errors_list)
     ```
 

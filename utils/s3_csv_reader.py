@@ -3,7 +3,7 @@ from pathlib import Path
 import data_analysis.compare_scheduled_and_rt as csrt
 from data_analysis.cache_manager import CacheManager
 
-CACHE_MANAGER = CacheManager(verbose=True)
+CACHE_MANAGER = CacheManager(verbose=False)
 
 def read_csv(filename: str | Path) -> pd.DataFrame:    
     """Read pandas csv from S3

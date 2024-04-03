@@ -49,7 +49,7 @@ There are a few types of data available in the public S3 bucket. The **data** li
    import pandas as pd
    
    START_DATE = "2022-05-20"
-   END_DATE = "2022-05-25"
+   END_DATE = ""
    BUCKET_URL = "https://dmu5hq5f7fk32.cloudfront.net"
    
    start_date = pendulum.parse(START_DATE, tz="America/Chicago")

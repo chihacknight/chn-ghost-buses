@@ -23,8 +23,8 @@ import shapely
 import geopandas
 
 from data_analysis.cache_manager import CacheManager
-from data_analysis.gtfs_fetcher import GTFSFetcher
-from data_analysis.schedule_manager import GTFSFeed, ScheduleIndexer, ScheduleFeedInfo
+from data_analysis.gtfs_fetcher import GTFSFetcher, ScheduleFeedInfo
+from data_analysis.schedule_manager import GTFSFeed, ScheduleIndexer
 
 
 logger = logging.getLogger()
@@ -241,17 +241,8 @@ class ScheduleSummarizer:
             GTFSFeed: A GTFSFeed object with formated dates
         """
         assert self.schedule_feed_info is not None
+        cta_gtfs = zipfile.ZipFile(self.gtfs_fetcher.retrieve_file(self.schedule_feed_info))
         version_id = self.schedule_feed_info.schedule_version
-        if not self.schedule_feed_info.transitfeeds:
-            cta_gtfs = zipfile.ZipFile(self.gtfs_fetcher.retrieve_file(version_id))
-        else:
-            cta_gtfs = zipfile.ZipFile(
-                self.cache_manager.retrieve(
-                    "downloads",
-                    f"{version_id}.zip",
-                    f"https://transitfeeds.com/p/chicago-transit-authority/165/{version_id}/download"
-                )
-            )
         data = GTFSFeed.extract_data(cta_gtfs, version_id=version_id)
         data = format_dates_hours(data)
         return data

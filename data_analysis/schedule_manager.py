@@ -8,8 +8,8 @@ import pendulum
 import logging
 import pandas as pd
 
-from data_analysis.gtfs_fetcher import GTFSFetcher
 from scrape_data.scrape_schedule_versions import create_schedule_list
+from data_analysis.gtfs_fetcher import GTFSFetcher, ScheduleFeedInfo, ScheduleSource
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)
@@ -66,49 +66,6 @@ class GTFSFeed:
         return cls(**data_dict)
 
 
-@dataclass
-class ScheduleFeedInfo:
-    """Represents a single schedule version with feed start and end dates.
-    """
-    schedule_version: str
-    feed_start_date: str
-    feed_end_date: str
-    transitfeeds: bool = True
-
-    def __str__(self):
-        if self.transitfeeds:
-            label = ''
-        else:
-            label = '_cta'
-        return f'v_{self.schedule_version}_fs_{self.feed_start_date}_fe_{self.feed_end_date}{label}'
-
-    def __getitem__(self, item):
-        if item not in frozenset(['schedule_version', 'feed_start_date', 'feed_end_date']):
-            raise KeyError(item)
-        return self.__dict__[item]
-
-    @classmethod
-    def from_pendulum(cls, version, start_date, end_date):
-        return cls(version.format("YYYYMMDD"),
-                   start_date.format("YYYY-MM-DD"),
-                   end_date.format("YYYY-MM-DD"))
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(d['schedule_version'],
-                   d['feed_start_date'],
-                   d['feed_end_date'])
-
-    def interval(self):
-        start = pendulum.parse(self.feed_start_date)
-        end = pendulum.parse(self.feed_end_date)
-        return pendulum.interval(start, end)
-
-    def contains(self, date_str: str) -> bool:
-        d = pendulum.parse(date_str)
-        return d in self.interval()
-
-
 class ScheduleIndexer:
     def __init__(self, cache_manager: CacheManager, month: int, year: int, start2022: bool = True):
         self.month = month
@@ -159,8 +116,8 @@ class ScheduleIndexer:
             next = gtfs_versions[0]
             sfi = ScheduleFeedInfo.from_pendulum(current,
                                                  pd(current).add(days=1),
-                                                 pd(next).subtract(days=1))
-            sfi.transitfeeds = False
+                                                 pd(next).subtract(days=1),
+                                                 ScheduleSource.S3)
             self.schedules.append(sfi)
             current = gtfs_versions.pop(0)
 

@@ -142,9 +142,7 @@ class Combiner:
         return self.compare_freq_by_rte is None
 
     def retrieve(self):
-        filename = f'{self.schedule_provider.schedule_feed_info.schedule_version}_combined.json'
-        df = self.cache_manager.retrieve_calculated_dataframe('combined', filename, self.combine, [])
-        #df = self.combine()
+        df = self.combine()
         self.compare_freq_by_rte = df
         return df
 

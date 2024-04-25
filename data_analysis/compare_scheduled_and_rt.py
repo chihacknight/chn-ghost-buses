@@ -134,16 +134,7 @@ class Combiner:
         self.rt_provider = RealtimeProvider(schedule_summarizer, agg_info)
         self.holidays = holidays
         self.agg_info = agg_info
-        self.compare_freq_by_rte = None
         self.save_to_s3 = save_to_s3
-
-    def empty(self):
-        return self.compare_freq_by_rte is None
-
-    def retrieve(self):
-        df = self.combine()
-        self.compare_freq_by_rte = df
-        return df
 
     def combine(self):
         feed = self.schedule_summarizer.schedule_feed_info
@@ -288,7 +279,7 @@ class RouteSummarizer:
             if new_end_date:
                 logger.debug(f'Using end date {new_end_date}')
             combiner = Combiner(self.cache_manager, feed, agg_info, self.holidays, self.save_to_s3)
-            this_iter = combiner.retrieve()
+            this_iter = combiner.combine()
             if this_iter.empty:
                 continue
             if new_start_date:

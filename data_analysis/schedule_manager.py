@@ -152,7 +152,9 @@ class ScheduleIndexer:
         current = gtfs_versions.pop(0)
         while gtfs_versions:
             next = gtfs_versions[0]
-            sfi = ScheduleFeedInfo.from_pendulum(current, pd(current), pd(next).subtract(days=1))
+            sfi = ScheduleFeedInfo.from_pendulum(current,
+                                                 pd(current).add(days=1),
+                                                 pd(next).subtract(days=1))
             sfi.transitfeeds = False
             self.schedules.append(sfi)
             current = gtfs_versions.pop(0)

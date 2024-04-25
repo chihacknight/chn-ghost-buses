@@ -117,7 +117,12 @@ class ScheduleIndexer:
         self.start2022 = start2022
         self.gtfs_fetcher = GTFSFetcher(cache_manager)
         self.schedules: List[ScheduleFeedInfo] = []
-        self.get_transitfeeds_schedules()
+        schedule_start = pendulum.date(self.year, self.month, 1)
+        if schedule_start <= LAST_TRANSITFEEDS:
+            self.get_transitfeeds_schedules()
+        else:
+            logger.info(f'Skipping transitfeeds schedule fetch because schedule start {schedule_start} is after the '
+                        'last available transitfeeds schedule.')
         self.get_gtfs_schedules()
 
     @staticmethod
@@ -140,7 +145,9 @@ class ScheduleIndexer:
         return end_date
 
     def get_transitfeeds_schedules(self):
-        transitfeeds_schedules = create_schedule_list(month=5, year=2022, start2022=True)
+        transitfeeds_schedules = create_schedule_list(month=self.month,
+                                                      year=self.year,
+                                                      start2022=self.start2022)
         for schedule_dict in transitfeeds_schedules:
             self.schedules.append(ScheduleFeedInfo.from_dict(schedule_dict))
 

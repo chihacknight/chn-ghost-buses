@@ -206,12 +206,16 @@ class Summarizer:
         self.save_to_s3 = save_to_s3
         self.start_date = None
         self.end_date = None
+        month = 5
+        year = 2022
         if start_date:
             self.start_date = start_date.date()
+            month = self.start_date.month
+            year = self.start_date.year
         if end_date:
             self.end_date = end_date.date()
         self.cache_manager = cache_manager
-        self.schedules = ScheduleIndexer(self.cache_manager, 5, 2022).get_schedules()
+        self.schedules = ScheduleIndexer(self.cache_manager, month, year).get_schedules()
         self.agg_info = AggInfo(freq=self.freq)
         self.holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]
 

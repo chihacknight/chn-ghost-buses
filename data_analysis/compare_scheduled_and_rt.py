@@ -129,11 +129,13 @@ class Combiner:
                  cache_manager: CacheManager,
                  provider,
                  agg_info: AggInfo,
+                 schedule_pbar,
                  holidays,
                  save_to_s3=False):
         self.cache_manager = cache_manager
         self.schedule_provider = provider
         self.rt_provider = RealtimeProvider(provider, agg_info)
+        self.schedule_pbar = schedule_pbar
         self.holidays = holidays
         self.agg_info = agg_info
         self.compare_freq_by_rte = None
@@ -149,10 +151,10 @@ class Combiner:
 
     def combine(self):
         feed = self.schedule_provider.schedule_feed_info
-        logging.info(f'Process feed {feed}')
-        # self.pbar.set_description(
-        #     f"Loading schedule version {feed['schedule_version']}"
-        # )
+        #logging.info(f'Process feed {feed}')
+        self.schedule_pbar.set_description(
+             f"Loading schedule version {feed['schedule_version']}"
+        )
 
         schedule = self.schedule_provider.get_route_daily_summary()
         if schedule.empty:
@@ -208,10 +210,8 @@ class Summarizer:
             self.start_date = start_date.date()
         if end_date:
             self.end_date = end_date.date()
-        #self.schedule_manager = static_gtfs_analysis.ScheduleManager(month=5, year=2022)
         self.cache_manager = cache_manager
         self.schedules = ScheduleIndexer(self.cache_manager, 5, 2022).get_schedules()
-        # 'schedule_daily_summary'
         self.agg_info = AggInfo(freq=self.freq)
         self.holidays: List[str] = ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"]
 
@@ -266,7 +266,8 @@ class Summarizer:
             logger.info(f'Filtering to {self.end_date}')
         gtfs_fetcher = GTFSFetcher(self.cache_manager)
 
-        for schedule in tqdm(self.schedules):
+        schedule_pbar = tqdm(self.schedules)
+        for schedule in schedule_pbar:
             feed = ScheduleSummarizer(self.cache_manager, gtfs_fetcher, schedule)
             new_start_date = None
             new_end_date = None
@@ -286,7 +287,7 @@ class Summarizer:
                 logging.info(f'Using start date {new_start_date}')
             if new_end_date:
                 logging.info(f'Using end date {new_end_date}')
-            combiner = Combiner(self.cache_manager, feed, agg_info, self.holidays, self.save_to_s3)
+            combiner = Combiner(self.cache_manager, feed, agg_info, schedule_pbar, self.holidays, self.save_to_s3)
             this_iter = combiner.retrieve()
             if this_iter.empty:
                 continue

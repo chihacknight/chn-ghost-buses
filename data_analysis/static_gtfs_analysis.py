@@ -90,8 +90,6 @@ class ScheduleSummarizer:
                  cache_manager: CacheManager,
                  gtfs_fetcher: GTFSFetcher,
                  schedule_feed_info : ScheduleFeedInfo):
-        # eliminate this?
-        self.gtfs_feed = None
         self.cache_manager = cache_manager
         self.gtfs_fetcher = gtfs_fetcher
         self.schedule_feed_info = schedule_feed_info
@@ -124,11 +122,8 @@ class ScheduleSummarizer:
         Returns:
             pd.DataFrame: A DataFrame with each trip that occurred per row.
         """
-        if self.gtfs_feed is None:
-            self.gtfs_feed = self.download_and_extract()
-            self.gtfs_feed = format_dates_hours(self.gtfs_feed)
-        assert self.gtfs_feed is not None
-        data = self.gtfs_feed
+        data = self.download_and_extract()
+        data = format_dates_hours(data)
 
         # construct a datetime index that has every day between calendar start and
         # end

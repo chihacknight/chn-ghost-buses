@@ -1,7 +1,5 @@
 import os
 
-import logging
-
 from s3path import S3Path
 import pandas as pd
 import pendulum
@@ -35,7 +33,6 @@ class RealtimeProvider:
             pd.DataFrame: A summary of full day data by
                 date, route, and destination.
         """
-        #print(f'>> make_daily_summary in {df}')
         df = df.copy()
         df = (
             df.groupby(["data_date", "rt"])
@@ -45,7 +42,6 @@ class RealtimeProvider:
         df["vh_count"] = df["vid"].apply(len)
         df["trip_count"] = df["tatripid"].apply(len)
         df["block_count"] = df["tablockid"].apply(len)
-        #print(f'>> make_daily_summary out {df}')
         return df
 
     def rt_summarize(self, rt_df: pd.DataFrame) -> pd.DataFrame:
@@ -55,7 +51,6 @@ class RealtimeProvider:
 
     def provide(self):
         feed = self.feed.schedule_feed_info
-        #logging.info(f'Process feed {feed}')
         start_date = feed["feed_start_date"]
         end_date = feed["feed_end_date"]
         date_range = [
@@ -65,9 +60,6 @@ class RealtimeProvider:
                 pendulum.from_format(end_date, "YYYY-MM-DD"),
             ).range("days")
         ]
-        #self.pbar.set_description(
-        #    f"Loading schedule version {feed['schedule_version']}"
-        #)
 
         rt_raw = pd.DataFrame()
         date_pbar = tqdm(date_range)
@@ -86,8 +78,6 @@ class RealtimeProvider:
             rt_raw = pd.concat([rt_raw, daily_data])
         if rt_raw.empty:
             return pd.DataFrame(), pd.DataFrame()
-
-        ##print(f'>> combined rt {rt_raw}')
 
         # basic reformatting
         rt = rt_raw.copy()

@@ -106,9 +106,7 @@ class ScheduleSummarizer:
         return self.schedule_feed_info.schedule_version
 
     def get_route_daily_summary(self):
-        logger.info("\nSummarizing trip data")
-        filename = f'trip_summary_{self.schedule_feed_info.feed_start_date}_to_{self.schedule_feed_info.feed_end_date}.json'
-        trip_summary =self.make_trip_summary()
+        trip_summary = self.make_trip_summary()
         route_daily_summary = self.summarize_date_rt(trip_summary)
         route_daily_summary['version'] = self.schedule_feed_info.schedule_version
         return route_daily_summary

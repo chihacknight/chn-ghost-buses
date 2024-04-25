@@ -55,7 +55,7 @@ class RealtimeProvider:
 
     def provide(self):
         feed = self.feed.schedule_feed_info
-        logging.info(f'Process feed {feed}')
+        #logging.info(f'Process feed {feed}')
         start_date = feed["feed_start_date"]
         end_date = feed["feed_end_date"]
         date_range = [
@@ -71,6 +71,7 @@ class RealtimeProvider:
 
         rt_raw = pd.DataFrame()
         date_pbar = tqdm(date_range)
+        date_pbar.set_description('Realtime analysis')
         for day in date_pbar:
             date_str = day.to_date_string()
             date_pbar.set_description(

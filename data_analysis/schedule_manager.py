@@ -52,12 +52,11 @@ class GTFSFeed:
         """
         data_dict = {}
         pbar = tqdm(cls.__annotations__.keys())
+        pbar.set_description(f'Loading schedule {version_id}')
         for txt_file in pbar:
-            pbar.set_description(f'Loading {txt_file}.txt')
             try:
                 with gtfs_zipfile.open(f'{txt_file}.txt') as file:
                     df = pd.read_csv(file, dtype="object")
-                    logger.info(f'{txt_file}.txt loaded')
 
             except KeyError as ke:
                 logger.info(f"{gtfs_zipfile} is missing required file")
@@ -154,7 +153,6 @@ class ScheduleIndexer:
     def get_gtfs_schedules(self):
         pd = lambda version: pendulum.parse(version).date()
         gtfs_versions = [version for version in self.gtfs_fetcher.get_versions() if pd(version) >= FIRST_CTA]
-        print(gtfs_versions)
         gtfs_versions.append(self.calculate_latest_rt_data_date())
         current = gtfs_versions.pop(0)
         while gtfs_versions:

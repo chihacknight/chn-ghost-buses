@@ -1,6 +1,7 @@
 import os
 
 from typing import List, Tuple
+import datetime
 import logging
 
 from s3path import S3Path
@@ -114,26 +115,23 @@ class Combiner:
     """Class to generate a combined DataFrame with the realtime route comparisons
 
     Args:
-        schedule_feeds (List[ScheduleFeedInfo]): A list of ScheduleFeedInfo instances,
-            each representing a schedule feed covering a specific time period.
-        schedule_data_list (List[dict]): A list of dictionaries with a
-            "schedule_version" key and "data" key with a value corresponding to
-            the daily route summary for that version.
+        cache_manager (CacheManager): instance of class that retrieves downloaded files from the cache
+        schedule_summarizer (ScheduleSummarizer): instance of class with schedule information.
         agg_info (AggInfo): An AggInfo object describing how data
             is to be aggregated.
-        holidays (List[str], optional): List of holidays in analyzed period in YYYY-MM-DD format.
+        holidays (List[str]): List of holidays in analyzed period in YYYY-MM-DD format.
             Defaults to ["2022-05-31", "2022-07-04", "2022-09-05", "2022-11-24", "2022-12-25"].
         save_to_s3 (bool, optional): whether to save the csv file to s3 bucket.
     """
     def __init__(self,
                  cache_manager: CacheManager,
-                 provider,
+                 schedule_summarizer: ScheduleSummarizer,
                  agg_info: AggInfo,
-                 holidays,
+                 holidays: List[str],
                  save_to_s3=False):
         self.cache_manager = cache_manager
-        self.schedule_provider = provider
-        self.rt_provider = RealtimeProvider(provider, agg_info)
+        self.schedule_summarizer = schedule_summarizer
+        self.rt_provider = RealtimeProvider(schedule_summarizer, agg_info)
         self.holidays = holidays
         self.agg_info = agg_info
         self.compare_freq_by_rte = None
@@ -148,9 +146,9 @@ class Combiner:
         return df
 
     def combine(self):
-        feed = self.schedule_provider.schedule_feed_info
+        feed = self.schedule_summarizer.schedule_feed_info
 
-        schedule = self.schedule_provider.get_route_daily_summary()
+        schedule = self.schedule_summarizer.get_route_daily_summary()
         if schedule.empty:
             return pd.DataFrame()
         schedule["date"] = pd.to_datetime(schedule.date, format="%Y-%m-%d")
@@ -181,19 +179,22 @@ class Combiner:
         return compare_freq_by_rte
 
 
-class Summarizer:
+class RouteSummarizer:
     def __init__(self,
                  cache_manager: CacheManager,
                  freq: str = 'D',
                  save_to_s3: bool = False,
-                 start_date = None,
-                 end_date = None):
+                 start_date: datetime.datetime = None,
+                 end_date: datetime.datetime = None):
         """Calculate the summary by route and day across multiple schedule versions
 
         Args:
+            cache_manager (CacheManager): instance of class that retrieves downloaded files from the cache
             freq (str): Frequency of aggregation. Defaults to Daily.
             save_to_s3 (bool, optional): whether to save DataFrame to s3.
                 Defaults to True.
+            start_date (datetime, optional): if set, first date to analyze.
+            end_date (datetime, optional): if set, last date to analyze.
         """
         self.freq = freq
         self.save_to_s3 = save_to_s3
@@ -300,7 +301,7 @@ class Summarizer:
 
 
 def main(cache_manager: CacheManager, freq: str = 'D', save_to_s3: bool = False, start_date = None, end_date = None, existing=None):
-    summarizer = Summarizer(cache_manager, freq, save_to_s3, start_date, end_date)
+    summarizer = RouteSummarizer(cache_manager, freq, save_to_s3, start_date, end_date)
     return summarizer.main(existing)
 
 if __name__ == "__main__":

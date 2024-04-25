@@ -317,7 +317,7 @@ class Updater:
         self.previous_df = pd.read_json(previous_file)
 
     # https://stackoverflow.com/questions/13703720/converting-between-datetime-timestamp-and-datetime64
-    def latest(self):
+    def latest(self) -> datetime.datetime:
         return pd.Timestamp(max(self.previous_df['date'].unique())).to_pydatetime()
 
 

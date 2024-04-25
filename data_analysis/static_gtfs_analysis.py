@@ -88,10 +88,12 @@ def format_dates_hours(data: GTFSFeed) -> GTFSFeed:
 class ScheduleSummarizer:
     def __init__(self,
                  cache_manager: CacheManager,
+                 gtfs_fetcher: GTFSFetcher,
                  schedule_feed_info : ScheduleFeedInfo):
         # eliminate this?
         self.gtfs_feed = None
         self.cache_manager = cache_manager
+        self.gtfs_fetcher = gtfs_fetcher
         self.schedule_feed_info = schedule_feed_info
 
     def start_date(self):
@@ -243,8 +245,7 @@ class ScheduleSummarizer:
         assert self.schedule_feed_info is not None
         version_id = self.schedule_feed_info.schedule_version
         if not self.schedule_feed_info.transitfeeds:
-            fetcher = self.cache_manager.retrieve_object('gtfs_fetcher', lambda: GTFSFetcher(self.cache_manager))
-            cta_gtfs = zipfile.ZipFile(fetcher.retrieve_file(version_id))
+            cta_gtfs = zipfile.ZipFile(self.gtfs_fetcher.retrieve_file(version_id))
         else:
             cta_gtfs = zipfile.ZipFile(
                 self.cache_manager.retrieve(

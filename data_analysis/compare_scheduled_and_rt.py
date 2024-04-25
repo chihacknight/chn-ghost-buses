@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from data_analysis.common import AggInfo, sum_by_frequency
 from data_analysis.cache_manager import CacheManager
+from data_analysis.gtfs_fetcher import GTFSFetcher
 from data_analysis.realtime_analysis import RealtimeProvider
 from data_analysis.schedule_manager import ScheduleIndexer
 from data_analysis.static_gtfs_analysis import ScheduleSummarizer
@@ -263,9 +264,10 @@ class Summarizer:
             combined_long = pd.DataFrame()
         if self.end_date is not None:
             logger.info(f'Filtering to {self.end_date}')
+        gtfs_fetcher = GTFSFetcher(self.cache_manager)
 
         for schedule in tqdm(self.schedules):
-            feed = ScheduleSummarizer(self.cache_manager, schedule)
+            feed = ScheduleSummarizer(self.cache_manager, gtfs_fetcher, schedule)
             new_start_date = None
             new_end_date = None
             if self.start_date is not None:

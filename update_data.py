@@ -327,23 +327,13 @@ def main() -> None:
         prog='UpdateData',
         description='Update Ghost Buses Data',
     )
-    parser.add_argument('--start_date', nargs=1, required=False, type=datetime.date.fromisoformat)
-    parser.add_argument('--end_date', nargs=1, required=False, type=datetime.date.fromisoformat)
     parser.add_argument('--update', nargs=1, required=False, help="Update all-day comparison file.")
-    parser.add_argument('--frequency', nargs=1, required=False,
-                        help="Frequency as decribed in pandas offset aliases.")
-    parser.add_argument('--recalculate', action='store_true',
-                        help="Don't use the cache when calculating results.")
+    parser.add_argument('--frequency', nargs=1, required=False, default='D',
+                        help="Frequency as described in pandas offset aliases.")
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
 
     start_date = None
-    end_date = None
-    if args.start_date:
-        start_date = datetime.datetime.combine(args.start_date[0], datetime.time(), tzinfo=datetime.UTC)
-    if args.end_date:
-        end_date = datetime.datetime.combine(args.end_date[0], datetime.time(), tzinfo=datetime.UTC)
-
     existing_df = None
     if args.update:
         u = Updater(args.update[0])
@@ -352,13 +342,9 @@ def main() -> None:
     freq = 'D'
     if args.frequency:
         freq = args.frequency[0]
-    cache_manager_args = {}
-    if args.recalculate:
-        cache_manager_args['ignore_cached_calculation'] = True
-    if args.verbose:
-        cache_manager_args['verbose'] = True
-    cache_manager = CacheManager(**cache_manager_args)
-    combined_long_df, summary_df = csrt.main(cache_manager, freq=freq, start_date=start_date, end_date=end_date, existing=existing_df)
+    cache_manager = CacheManager(verbose=args.verbose)
+    combined_long_df, summary_df = csrt.main(cache_manager, freq=freq, start_date=start_date, end_date=None,
+                                             existing=existing_df)
 
     combined_long_df.loc[:, "ratio"] = (
         combined_long_df.loc[:, "trip_count_rt"]

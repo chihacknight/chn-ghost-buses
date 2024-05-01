@@ -27,6 +27,7 @@ import geopandas
 
 from tqdm import tqdm
 from scrape_data.scrape_schedule_versions import create_schedule_list
+from data_analysis.cache_manager import CacheManager
 
 VERSION_ID = "20220718"
 BUCKET = os.getenv('BUCKET_PUBLIC', 'chn-ghost-buses-public')
@@ -360,11 +361,10 @@ def download_zip(version_id: str) -> zipfile.ZipFile:
     """
     logger.info('Downloading CTA data')
     CTA_GTFS = zipfile.ZipFile(
-        BytesIO(
-            requests.get(
-                f"https://transitfeeds.com/p/chicago-transit-authority"
-                f"/165/{version_id}/download"
-            ).content
+        CacheManager(verbose=True).retrieve(
+            "transitfeeds_schedules",
+            f"{version_id}.zip",
+            f"https://transitfeeds.com/p/chicago-transit-authority/165/{version_id}/download"
         )
     )
     logging.info('Download complete')

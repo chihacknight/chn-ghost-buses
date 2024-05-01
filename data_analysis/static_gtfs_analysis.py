@@ -21,10 +21,12 @@ import zipfile
 import pendulum
 import shapely
 import geopandas
+from tqdm import tqdm
 
 from data_analysis.cache_manager import CacheManager
 from data_analysis.gtfs_fetcher import GTFSFetcher, ScheduleFeedInfo
 from data_analysis.schedule_manager import GTFSFeed, ScheduleIndexer
+from scrape_data.scrape_schedule_versions import create_schedule_list
 
 
 logger = logging.getLogger()

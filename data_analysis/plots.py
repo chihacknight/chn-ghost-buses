@@ -34,6 +34,7 @@ current_dir = Path(__file__)
 project_dir = next(p for p in current_dir.parents if p.name == f"{project_name}")
 PLOTS_PATH = project_dir / "plots" / "scratch"
 DATA_PATH = project_dir / "data_output" / "scratch"
+ASSETS_PATH = project_dir / "data_output"
 
 logger = logging.getLogger()
 logging.basicConfig(level=logging.INFO)

@@ -4,6 +4,7 @@ import calendar
 import datetime
 
 import pandas as pd
+import geopandas
 
 import data_analysis.compare_scheduled_and_rt as csrt
 import data_analysis.plots as plots
@@ -171,6 +172,8 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     for col in summary_df_mean.columns[2:]:
         summary_df_mean = plots.calculate_percentile_and_rank(summary_df_mean, col=col)
 
+    summary_df_wk = None
+
     # JSON files for frontend interactive map by day type
     for day_type in plots.DAY_NAMES.keys():
         summary_df_mean_day = plots.filter_day_type(summary_df_mean, day_type=day_type)
@@ -181,7 +184,25 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
             f"{save_path}.json", date_format="iso", orient="records"
         )
         summary_df_mean_day.to_html(f"{save_path}_table.html", index=False)
+        if day_type == 'wk':
+            summary_df_wk = summary_df_mean_day
 
+    # data.json for frontend
+    shapes_file = plots.ASSETS_PATH / 'bus_route_shapes_simplified_linestring.json'
+    shapes = geopandas.read_file(shapes_file, driver='GeoJSON')
+    raw_data_json = summary_df_wk.set_index('route_id').join(shapes.set_index('route_id'))
+    data_cols = ['route_id', 'day_type', 'ratio', 'ratio_percentiles', 'ratio_ranking', 'shape_id', 'direction', 'trip_id',
+                 'route_short_name', 'route_long_name', 'route_type', 'route_url', 'route_color', 'route_text_color',
+                 'geometry']
+    data_json = geopandas.GeoDataFrame(raw_data_json.reset_index()[data_cols])
+    data_json_path = plots.DATA_PATH / f"frontend_data_{start_date}_to_{end_date}_wk"
+    data_json.to_file(
+        f"{data_json_path}.json",
+        date_format="iso",
+        orient="records",
+        default_handler=str,
+        driver='GeoJSON'
+    )
 
 def update_lineplot_data(data_update: DataUpdate) -> None:
     """Refresh data for lineplots of bus performance over time

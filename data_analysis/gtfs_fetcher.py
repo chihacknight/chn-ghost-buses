@@ -100,8 +100,8 @@ class GTFSFetcher:
 
     def retrieve_file(self, schedule_feed_info: ScheduleFeedInfo):
         version_id = schedule_feed_info.schedule_version
-        local_filename, _, s3_filename, _ = self.versions[version_id]
         if schedule_feed_info.schedule_source == ScheduleSource.S3:
+            local_filename, _, s3_filename, _ = self.versions[version_id]
             url = f'https://{BUCKET_PUBLIC}.s3.us-east-2.amazonaws.com/{s3_filename}'
             return self.cache_manager.retrieve('cta_zipfiles', local_filename, url)
         elif schedule_feed_info.schedule_source == ScheduleSource.TRANSITFEEDS:

@@ -19,6 +19,12 @@ BUCKET_PRIVATE='chn-ghost-buses-private'
 ```
 Note that there may be permissions issues when running `rt_daily_aggregations.py` with `BUCKET_PUBLIC` as the `BUCKET_NAME`.
 
+You may also need to set the PROJECT_NAME environment variable:
+
+```
+PROJECT_NAME=chn-ghost-buses
+```
+
 ## Updating data
 
 The `update_data` script reads realtime and schedule data, combines it, and produces output files used by the frontend. The common use case will be to process data that has arrived since the previous frontend data deploy. To do this, check out the `ghost-buses-frontend` repository alongside this backend repository. Then run the following:

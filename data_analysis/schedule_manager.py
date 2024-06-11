@@ -67,10 +67,9 @@ class GTFSFeed:
 
 
 class ScheduleIndexer:
-    def __init__(self, cache_manager: CacheManager, month: int, year: int, start2022: bool = True):
+    def __init__(self, cache_manager: CacheManager, month: int, year: int):
         self.month = month
         self.year = year
-        self.start2022 = start2022
         self.gtfs_fetcher = GTFSFetcher(cache_manager)
         self.schedules: List[ScheduleFeedInfo] = []
         schedule_start = pendulum.date(self.year, self.month, 1)
@@ -102,8 +101,7 @@ class ScheduleIndexer:
 
     def get_transitfeeds_schedules(self):
         transitfeeds_schedules = create_schedule_list(month=self.month,
-                                                      year=self.year,
-                                                      start2022=self.start2022)
+                                                      year=self.year)
         for schedule_dict in transitfeeds_schedules:
             self.schedules.append(ScheduleFeedInfo.from_dict(schedule_dict))
 

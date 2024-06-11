@@ -33,7 +33,7 @@ SCHEDULE_RT_PATH = S3_BASE_PATH / "schedule_rt_comparisons" / "route_level"
 SCHEDULE_SUMMARY_PATH = S3_BASE_PATH / "schedule_summaries" / "route_level"
 
 
-def summarize_schedule(sched_df: pd.DataFrame, agg_info: AggInfo) -> pd.DataFrame:
+def calc_sched_freq_by_rte(sched_df: pd.DataFrame, agg_info: AggInfo) -> pd.DataFrame:
     sched_df = sched_df.copy()
     sched_freq_by_rte = sum_by_frequency(
         sched_df,
@@ -144,7 +144,7 @@ class Combiner:
             return pd.DataFrame()
         schedule["date"] = pd.to_datetime(schedule.date, format="%Y-%m-%d")
 
-        sched_freq_by_rte = summarize_schedule(schedule, agg_info=self.agg_info)
+        sched_freq_by_rte = calc_sched_freq_by_rte(schedule, agg_info=self.agg_info)
         rt_freq_by_rte = self.rt_provider.provide()
 
         compare_freq_by_rte = sum_trips_by_rt_by_freq(

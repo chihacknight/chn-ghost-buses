@@ -111,6 +111,8 @@ class GTFSFetcher:
             return None
 
 
+# Prints cached downloaded schedules for local debugging purposes. Run from project root:
+#  python -m data_analysis.gtfs_fetcher
 if __name__ == "__main__":
     fetcher = GTFSFetcher(CacheManager())
     for filename, size, fullkey, version in fetcher.list():

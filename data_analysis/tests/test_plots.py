@@ -25,5 +25,6 @@ def test_lineplot(mocker):
             {'x': [1, 2], 'y': [3, 4]}
         )
     )
-    
-    assert mocked_plot.called
+
+    assert mocked_plot.assert_called_once
+    assert mocked_plot.call_args[1]["filename"] == "lineplot_of_y_over_x"

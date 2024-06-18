@@ -1,3 +1,4 @@
+numpy==1.26.2
 pendulum==2.1.2
 requests==2.31.0
 beautifulsoup4==4.11.1

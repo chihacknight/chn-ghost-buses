@@ -5,7 +5,7 @@ from data_analysis.cache_manager import CacheManager
 
 CACHE_MANAGER = CacheManager(verbose=False)
 
-def read_csv(filename: str | Path) -> pd.DataFrame:    
+def read_csv(filename: str | Path) -> pd.DataFrame:
     """Read pandas csv from S3
 
     Args:
@@ -27,4 +27,3 @@ def read_csv(filename: str | Path) -> pd.DataFrame:
         low_memory=False
         )
     return df
-    

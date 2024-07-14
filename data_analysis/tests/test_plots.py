@@ -1,6 +1,6 @@
 from typing import Union
 import plotly.graph_objects
-from data_analysis.plots import create_save_path, lineplot, n_worst_best_routes
+from data_analysis.plots import create_save_path, lineplot, n_worst_best_routes, merge_ridership_combined
 import pandas as pd
 import geopandas 
 
@@ -52,3 +52,35 @@ def test_n_worst_best_routes(mocker):
     ))
     
     assert best.iloc[0]["route_id"] == 1
+
+def test_merge_ridership_combined(mocker):
+    df1 = pd.DataFrame(
+        {
+            "Latitude": [-34.58, -15.78, -33.45, 4.60, 10.48],
+            "Longitude": [-58.66, -47.91, -70.66, -74.08, -66.86],
+            "p_percentiles": [1, 2000, 3000, 4, 5],
+            "p": [1, 2000, 3000, 4, 5],
+            "route_id": [1, 2, 300, 4, 5],
+            "route": [1, 2, 300, 4, 5],
+            "date": ["1/1/2000", "1/1/2000", "1/1/2000", "1/1/2000", "1/1/2000"]
+        }
+    )
+
+    df2 = pd.DataFrame(
+        {
+            "Latitude": [-34.58, -15.78, -66.45, 4.60, 10.48],
+            "Longitude": [-58.66, -47.91, -70.66, -74.08, -86.86],
+            "p_percentiles": [1, 2000, 3000, 4, 5],
+            "p": [1, 2000, 3000, 4, 5],
+            "route_id": [1, 2, 300, 4, 7],
+            "route": [1, 2, 600, 4, 5],
+            "date": ["1/1/2000", "1/1/2000", "1/1/2000", "1/1/2000", "1/1/2000"]
+        }
+    )
+    
+    result = merge_ridership_combined(df1, df2, "1/1/2000", "1/2/2000")
+
+    assert result["Longitude_x"][1] == -47.91
+    assert result["Longitude_x"][2] == -74.08
+    assert result["route_x"][1] == 2
+    assert result["route_x"][2] == 4

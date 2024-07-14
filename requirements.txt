@@ -13,3 +13,4 @@ mapclassify>=2.5.0
 plotly==5.11.0
 kaleido==0.2.1
 pre-commit==2.20.0
+pytest-mock==3.14.0

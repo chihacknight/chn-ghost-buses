@@ -1,4 +1,4 @@
-**As of September 2024, the [Mansueto Institute for Urban Innovation](https://miurban.uchicago.edu/) is taking over maintenance of the data and data pipelines originally created for this project. Archived real-time bus location data dating back to May 2022 will remain publicly available through them. Stay tuned for more information and announcements from them about future data access; for now, data is available per the below.**
+**As of September 2024, the [Mansueto Institute for Urban Innovation](https://miurban.uchicago.edu/) is taking over maintenance of the data and data pipelines originally created for this project. Archived real-time bus location data dating back to May 2022 will remain publicly available through them. Stay tuned for more information from them about future data access; for now, data is available per the below.**
 
 # Ghost Buses Data README
 

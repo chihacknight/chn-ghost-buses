@@ -195,17 +195,17 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     data_cols = ['route_id', 'day_type', 'ratio', 'ratio_percentiles', 'ratio_ranking', 'shape_id', 'direction', 'trip_id',
                  'route_short_name', 'route_long_name', 'route_type', 'route_url', 'route_color', 'route_text_color',
                  'geometry']
-    data_json = geopandas.GeoDataFrame(raw_data_json.reset_index()[data_cols])
+    
+    # create a json string so we can append the dates attribute
+    data_json = geopandas.GeoDataFrame(raw_data_json.reset_index()[data_cols]).to_json()
+    data_json = json.loads(data_json)
+    data_json.update({"dates": {"start": start_date, "end": end_date }})
 
     data_json_path = plots.DATA_PATH / f"frontend_data_{start_date}_to_{end_date}_wk"
 
-    data_json.to_file(
-        f"{data_json_path}.json",
-        date_format="iso",
-        orient="records",
-        default_handler=str,
-        driver='GeoJSON'
-    )
+    with open(f"{data_json_path}.json", 'w') as f: 
+        json.dump(data_json, f)
+
 
 def update_lineplot_data(data_update: DataUpdate) -> None:
     """Refresh data for lineplots of bus performance over time
@@ -233,7 +233,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
 
     # date being in actual datetime format is problematic for the front end
     combined_long_df["date_dt"] = combined_long_df["date"].copy()
-    combined_long_df["date"] = pd.to_datetime(combined_long_df.date_dt, format="%Y-%m-%d")
+    combined_long_df["date"] = combined_long_df.date_dt.dt.strftime('%Y-%m-%d')
 
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]

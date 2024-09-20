@@ -2,6 +2,7 @@ from collections import namedtuple
 from argparse import ArgumentParser
 import calendar
 import datetime
+import json
 
 import pandas as pd
 import geopandas
@@ -195,7 +196,9 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
                  'route_short_name', 'route_long_name', 'route_type', 'route_url', 'route_color', 'route_text_color',
                  'geometry']
     data_json = geopandas.GeoDataFrame(raw_data_json.reset_index()[data_cols])
+
     data_json_path = plots.DATA_PATH / f"frontend_data_{start_date}_to_{end_date}_wk"
+
     data_json.to_file(
         f"{data_json_path}.json",
         date_format="iso",
@@ -227,6 +230,10 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     combined_long_df = data_update.combined_long_df.copy()
     start_date = data_update.start_date
     end_date = data_update.end_date
+
+    # date being in actual datetime format is problematic for the front end
+    combined_long_df["date_dt"] = combined_long_df["date"].copy()
+    combined_long_df["date"] = pd.to_datetime(combined_long_df.date_dt, format="%Y-%m-%d")
 
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]

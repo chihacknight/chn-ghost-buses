@@ -128,6 +128,10 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     start_date = data_update.start_date
     end_date = data_update.end_date
 
+    # filter to only weekdays because that is all we use for the following calculations
+    combined_long_df = combined_long_df[combined_long_df.date.dt.dayofweek < 5]
+    summary_df = summary_df[summary_df.day_type == 'wk']
+
     # Remove 74 Fullerton bus from data
     combined_long_df = combined_long_df.loc[combined_long_df["route_id"] != "74"]
     summary_df = summary_df.loc[summary_df["route_id"] != "74"]
@@ -173,20 +177,7 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     for col in summary_df_mean.columns[2:]:
         summary_df_mean = plots.calculate_percentile_and_rank(summary_df_mean, col=col)
 
-    summary_df_wk = None
-
-    # JSON files for frontend interactive map by day type
-    for day_type in plots.DAY_NAMES.keys():
-        summary_df_mean_day = plots.filter_day_type(summary_df_mean, day_type=day_type)
-        save_path = (
-            plots.DATA_PATH / f"all_routes_{start_date}_to_{end_date}_{day_type}"
-        )
-        summary_df_mean_day.to_json(
-            f"{save_path}.json", date_format="iso", orient="records"
-        )
-        summary_df_mean_day.to_html(f"{save_path}_table.html", index=False)
-        if day_type == 'wk':
-            summary_df_wk = summary_df_mean_day
+    summary_df_wk = summary_df_mean
 
     # data.json for frontend
     shapes_file = plots.ASSETS_PATH / 'bus_route_shapes_simplified_linestring.json'
@@ -232,8 +223,7 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     end_date = data_update.end_date
 
     # date being in actual datetime format is problematic for the front end
-    combined_long_df["date_dt"] = combined_long_df["date"].copy()
-    combined_long_df["date"] = combined_long_df.date_dt.dt.strftime('%Y-%m-%d')
+    combined_long_df["date"] = combined_long_df.date.dt.strftime('%Y-%m-%d')
 
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]

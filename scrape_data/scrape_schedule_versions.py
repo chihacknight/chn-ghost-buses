@@ -14,30 +14,14 @@ logger.setLevel(logging.INFO)
 BASE_URL = "https://transitfeeds.com"
 
 
-def check_latest_rt_data_date() -> str:
-    """Fetch the latest available date of real-time bus data
-
-    Returns:
-        str: A string of the latest date in YYYY-MM-DD format.
-    """
-    if pendulum.now("America/Chicago").hour >= 11:
-        end_date = (
-            pendulum.yesterday("America/Chicago")
-            .date().format('YYYY-MM-DD')
-        )
-    else:
-        end_date = (
-            pendulum.now("America/Chicago").subtract(days=2)
-            .date().format('YYYY-MM-DD')
-        )
-    return end_date
-
-
 def fetch_schedule_versions(month: int, year: int) -> List[pendulum.date]:
     """Get the schedule versions from transitfeeds.com from the most recent
        to specified month and year (inclusive). In case there are
        multiple schedules for a given month and year pair,
        all schedules will be fetched.
+
+       The last update to transitfeeds.com schedules was in December 2023
+       and no further updates are planned.
 
     Args:
         month (int): The month of interest
@@ -152,11 +136,6 @@ def calculate_version_date_ranges(
         except IndexError:
             pass
 
-    # Handle the current schedule version by setting the end date as the latest
-    # available date for data.
-    start_end_list.append(
-        (schedule_list[-1].add(days=1), check_latest_rt_data_date())
-    )
     return schedule_list, start_end_list
 
 

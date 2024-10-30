@@ -1,9 +1,15 @@
 from collections import namedtuple
+from argparse import ArgumentParser
+import calendar
+import datetime
+import json
 
 import pandas as pd
+import geopandas
 
 import data_analysis.compare_scheduled_and_rt as csrt
 import data_analysis.plots as plots
+from data_analysis.cache_manager import CacheManager
 
 DataUpdate = namedtuple(
     "DataUpdate", ["combined_long_df", "summary_df", "start_date", "end_date"]
@@ -122,6 +128,10 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     start_date = data_update.start_date
     end_date = data_update.end_date
 
+    # filter to only weekdays because that is all we use for the following calculations
+    combined_long_df = combined_long_df[combined_long_df.date.dt.dayofweek < 5]
+    summary_df = summary_df[summary_df.day_type == 'wk']
+
     # Remove 74 Fullerton bus from data
     combined_long_df = combined_long_df.loc[combined_long_df["route_id"] != "74"]
     summary_df = summary_df.loc[summary_df["route_id"] != "74"]
@@ -167,16 +177,25 @@ def update_interactive_map_data(data_update: DataUpdate) -> None:
     for col in summary_df_mean.columns[2:]:
         summary_df_mean = plots.calculate_percentile_and_rank(summary_df_mean, col=col)
 
-    # JSON files for frontend interactive map by day type
-    for day_type in plots.DAY_NAMES.keys():
-        summary_df_mean_day = plots.filter_day_type(summary_df_mean, day_type=day_type)
-        save_path = (
-            plots.DATA_PATH / f"all_routes_{start_date}_to_{end_date}_{day_type}"
-        )
-        summary_df_mean_day.to_json(
-            f"{save_path}.json", date_format="iso", orient="records"
-        )
-        summary_df_mean_day.to_html(f"{save_path}_table.html", index=False)
+    summary_df_wk = summary_df_mean
+
+    # data.json for frontend
+    shapes_file = plots.ASSETS_PATH / 'bus_route_shapes_simplified_linestring.json'
+    shapes = geopandas.read_file(shapes_file, driver='GeoJSON')
+    raw_data_json = summary_df_wk.set_index('route_id').join(shapes.set_index('route_id'))
+    data_cols = ['route_id', 'day_type', 'ratio', 'ratio_percentiles', 'ratio_ranking', 'shape_id', 'direction', 'trip_id',
+                 'route_short_name', 'route_long_name', 'route_type', 'route_url', 'route_color', 'route_text_color',
+                 'geometry']
+    
+    # create a json string so we can append the dates attribute
+    data_json = geopandas.GeoDataFrame(raw_data_json.reset_index()[data_cols]).to_json()
+    data_json = json.loads(data_json)
+    data_json.update({"dates": {"start": start_date, "end": end_date }})
+
+    data_json_path = plots.DATA_PATH / f"frontend_data_{start_date}_to_{end_date}_wk"
+
+    with open(f"{data_json_path}.json", 'w') as f: 
+        json.dump(data_json, f)
 
 
 def update_lineplot_data(data_update: DataUpdate) -> None:
@@ -202,6 +221,9 @@ def update_lineplot_data(data_update: DataUpdate) -> None:
     combined_long_df = data_update.combined_long_df.copy()
     start_date = data_update.start_date
     end_date = data_update.end_date
+
+    # date being in actual datetime format is problematic for the front end
+    combined_long_df["date"] = combined_long_df.date.dt.strftime('%Y-%m-%d')
 
     # JSON files for lineplots
     json_cols = ["date", "trip_count_rt", "trip_count_sched", "ratio", "route_id"]
@@ -270,10 +292,10 @@ def update_barchart_data(
 
     last_month = plots.datetime.now().month - 1
     current_year = plots.datetime.now().year
-    last_day = plots.calendar.monthrange(current_year, last_month)[1]
+    last_day = calendar.monthrange(current_year, last_month)[1]
     last_month_str = f"0{last_month}" if last_month < 10 else str(last_month)
 
-    combined_long_groupby_day_type = plots.filter_dates(
+    combined_long_groupby_day_type = filter_dates(
         combined_long_groupby_day_type,
         bar_start_date,
         f"{current_year}-{last_month_str}-{last_day}",
@@ -308,9 +330,39 @@ def update_barchart_data(
     )
 
 
+class Updater:
+    def __init__(self, previous_file):
+        self.previous_df = pd.read_json(previous_file)
+
+    # https://stackoverflow.com/questions/13703720/converting-between-datetime-timestamp-and-datetime64
+    def latest(self) -> datetime.datetime:
+        return pd.Timestamp(max(self.previous_df['date'].unique())).to_pydatetime()
+
+
 def main() -> None:
     """Refresh data for interactive map, lineplots, and barcharts."""
-    combined_long_df, summary_df = csrt.main(freq="D")
+    parser = ArgumentParser(
+        prog='UpdateData',
+        description='Update Ghost Buses Data',
+    )
+    parser.add_argument('--update', nargs=1, required=False, help="Update all-day comparison file.")
+    parser.add_argument('--frequency', nargs=1, required=False, default='D',
+                        help="Frequency as described in pandas offset aliases.")
+    parser.add_argument('--verbose', action='store_true')
+    args = parser.parse_args()
+
+    start_date = None
+    existing_df = None
+    if args.update:
+        u = Updater(args.update[0])
+        start_date = u.latest()
+        existing_df = u.previous_df
+    freq = 'D'
+    if args.frequency:
+        freq = args.frequency[0]
+    cache_manager = CacheManager(verbose=args.verbose)
+    combined_long_df, summary_df = csrt.main(cache_manager, freq=freq, start_date=start_date, end_date=None,
+                                             existing=existing_df)
 
     combined_long_df.loc[:, "ratio"] = (
         combined_long_df.loc[:, "trip_count_rt"]

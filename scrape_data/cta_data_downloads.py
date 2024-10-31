@@ -1,10 +1,11 @@
 import boto3
 import sys
+import zipfile
 
 import pendulum
 from io import StringIO
 import pandas as pd
-import zipfile
+from typing import Tuple
 
 import data_analysis.static_gtfs_analysis as sga
 import data_analysis.schedule_manager as sm

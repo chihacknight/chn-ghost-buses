@@ -3,7 +3,7 @@ import sys
 import zipfile
 
 import pendulum
-from io import StringIO
+from io import BytesIO, StringIO
 import pandas as pd
 from typing import Tuple
 

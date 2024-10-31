@@ -1,9 +1,12 @@
 import boto3
+import requests
 import sys
+import zipfile
 
 import pendulum
-from io import StringIO
+from io import BytesIO, StringIO
 import pandas as pd
+from typing import Tuple
 
 import data_analysis.static_gtfs_analysis as sga
 import data_analysis.schedule_manager as sm
@@ -29,7 +32,21 @@ s3 = boto3.resource(
 
 today = pendulum.now('America/Chicago').to_date_string()
 
-CTA_GTFS, zipfile_bytes_io = sga.download_cta_zip()
+def download_cta_zip() -> Tuple[zipfile.ZipFile, BytesIO]:
+    """Download CTA schedule data from transitchicago.com
+    Returns:
+        zipfile.ZipFile: A zipfile of the latest GTFS schedule data from transitchicago.com
+    """
+    print('Downloading CTA data')
+    zip_bytes_io = BytesIO(
+            requests.get("https://www.transitchicago.com/downloads/sch_data/google_transit.zip"
+            ).content
+        )
+    CTA_GTFS = zipfile.ZipFile(zip_bytes_io)
+    print('Download complete')
+    return CTA_GTFS, zip_bytes_io
+
+CTA_GTFS, zipfile_bytes_io = download_cta_zip()
 
 def save_cta_zip() -> None:
     print(f'Saving zipfile available at '

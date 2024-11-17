@@ -1,25 +1,27 @@
+**As of September 2024, the [Mansueto Institute for Urban Innovation](https://miurban.uchicago.edu/) is taking over maintenance of the data and data pipelines originally created for this project. Archived real-time bus location data dating back to May 2022 will remain publicly available through them. Stay tuned for more information from them about future data access; for now, data is available per the below.**
+
 # Ghost Buses Data README
 
 All data scraped as part of this project is originally provided by the CTA and is subject to CTA's terms of use. Realtime data refers to data from the CTA's [bus tracker API's `getvehicles` feed](https://www.transitchicago.com/developers/bustracker/) (which we scrape every 5 minutes) and schedule data refers to data from the [CTA's GTFS feed](https://www.transitchicago.com/developers/gtfs/) (which we do not yet automatically scrape), sometimes collected via the [Transitfeeds archive](https://transitfeeds.com/p/chicago-transit-authority/165) to access historical / prior versioned feeds. Data collection started the evening of May 19; the first few files on that date are experimental so it's recommended to start analysis on 5/20 when the data is cleaner.
 
-As of 10/15/22, the high-level data flow for the CHN Ghost Buses project is as follows:
+As of 10/15/22, the high-level data flow for the CHN Ghost Buses project was as follows:
 
 ```mermaid
 flowchart LR;
 scraper[scrape_data.py scrapes raw realtime bus location data every 5 minutes] --writes data to--> s3[JSON files in chn-ghost-buses-public S3 bucket] --daily processed into--> csv[CSV files in chn-ghost-buses-public bucket]
 ```
 
-## Accessing data in S3 
+As of fall 2024, the Mansueto Institute is maintaining the back end data flow. 
 
-Data in the public `chn-ghost-buses-public` bucket is publicly accessible for reading, but only @lauriemerrell can currently write data to it.
+## Accessing data in S3 
 
 The data can be accessed several ways. To access an individual file, you can:
 
-* Go directly to the URL for a resource in your browser to download the file locally. URLs follow the form `https://dmu5hq5f7fk32.cloudfront.net/{path_to_specific_file_as_described below}`; for example: `https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv`. 
+* Go directly to the URL for a resource in your browser to download the file locally. URLs follow the form `https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/{path_to_specific_file_as_described below}`; for example: `https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/full_day_data/2022-10-01.csv`. 
 
-* Use standard request libraries and packages. For example, you can use [wget](https://www.gnu.org/software/wget/manual/) like `wget https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv` (see above for notes on the URL format/construction).
+* Use standard request libraries and packages. For example, you can use [wget](https://www.gnu.org/software/wget/manual/) like `wget https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/full_day_data/2022-10-01.csv` (see above for notes on the URL format/construction).
 
-* Use Pandas, which recognizes `s3` file URIs if you install the `s3fs` dependency. So, for example, you can use: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')` to load a file as a Pandas dataframe. *Note: Some members of the breakout group have experienced challenges accessing the data in this way; you can also use a full URL as described in the first bullet to load data into Pandas like: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')`.*
+* Use Pandas, which recognizes `s3` file URIs if you install the `s3fs` dependency. So, for example, you can use: `pandas.read_csv('https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/full_day_data/2022-10-01.csv')` to load a file as a Pandas dataframe. 
 
 ## Available data
 
@@ -33,11 +35,11 @@ There are a few types of data available in the public S3 bucket. The **data** li
             * `data_hour`: The hour extracted from the `data_time` (integer between 0 and 23).
             * `data_date`: The date extracted from the `data_time`.
         * These files are generated daily between 10 and 11am Central for the prior day. There is one file per full day from `2022-05-20` until the day before you are making the request. So, if you are checking on `2022-10-02` after 11am Central, data will be available up to and including `2022-10-01`.
-        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_data_v2`. Full filenames are like `bus_full_day_data_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_data_v2/2022-10-01.csv')`.
+        * In S3, these are available in a folder called `full_day_data`. Full filenames are like `full_day_data/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/full_day_data/2022-10-01.csv')`.
     * **Errors**: 
         * These are CSV files that contain all the error data we received from the API, concatenated together for a full day. The schema of the data is exactly what is returned from the API, with only a `scrape_file` field (see above) added that records the name of the S3 resource where the original JSON response that contained this row is saved; see [the `getvehicles` section of the CTA documentation]('https://www.transitchicago.com/assets/1/6/cta_Bus_Tracker_API_Developer_Guide_and_Documentation_20160929.pdf') for field definitions from the API.
         * These files are generated daily between 10 and 11am Central for the prior day. There is one file per full day from `2022-05-20` until the day before you are making the request. So, if you are checking on `2022-10-02` after 11am Central, errors will be available up to and including `2022-10-01`.
-        * In S3, these are available in the `chn-ghost-buses-public` bucket in a folder called `bus_full_day_errors_v2`. Full filenames are like `bus_full_day_errors_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://dmu5hq5f7fk32.cloudfront.net/bus_full_day_errors_v2/2022-10-01.csv')`.
+        * In S3, these are available in a folder called `bus_full_day_errors_v2`. Full filenames are like `bus_full_day_errors_v2/{date in YYYY-MM-DD format}.csv`. So, to load the data for `2022-10-01` in Pandas, you could do: `pandas.read_csv('https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch/bus_full_day_errors_v2/2022-10-01.csv')`.
 
 
     ## Script to load data
@@ -50,7 +52,7 @@ There are a few types of data available in the public S3 bucket. The **data** li
    
    START_DATE = "2022-05-20"
    END_DATE = ""
-   BUCKET_URL = "https://dmu5hq5f7fk32.cloudfront.net"
+   BUCKET_URL = "https://d2v7z51jmtm0iq.cloudfront.net/cta-stop-watch"
    
    start_date = pendulum.parse(START_DATE, tz="America/Chicago")
    is_after_11 = pendulum.now("America/Chicago").hour >= 11
@@ -66,7 +68,7 @@ There are a few types of data available in the public S3 bucket. The **data** li
    errors_list = []
    
    for d in date_list:
-       data_url = f"{BUCKET_URL}/bus_full_day_data_v2/{d}.csv"
+       data_url = f"{BUCKET_URL}/full_day_data/{d}.csv"
        print(f"{pendulum.now()}: processing {d} data")
        try:
            daily_data = pd.read_csv(data_url, low_memory=False)

@@ -1,6 +1,6 @@
 # Chi Hack Night Ghost Buses Breakout Group
 
-This is the repo for the [Chi Hack Night Ghost Buses breakout group](https://github.com/chihacknight/breakout-groups/issues/217)! If you're interested in working on it, you're invited to join the breakout group by [attending Chi Hack Night](https://chihacknight.org/).
+This is the repo for the [Chi Hack Night Ghost Buses breakout group](https://github.com/chihacknight/breakout-groups/issues/217)! **As of September 2024, the [Mansueto Institute for Urban Innovation](https://miurban.uchicago.edu/) is taking over maintenance of the data and data pipelines originally created for this project. Archived real-time bus location data dating back to May 2022 will remain publicly available through them. This repo is no longer actively maintained. It is preserved in its state as of September 2024 for reference.**
 
 ## AWS architecture
 __Updated May 19, 2022__
